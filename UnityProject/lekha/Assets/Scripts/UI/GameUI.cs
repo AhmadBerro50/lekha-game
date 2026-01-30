@@ -46,9 +46,9 @@ namespace Lekha.UI
         private ScoreSummaryPopup scoreSummaryPopup;
 
         [Header("Card Settings")]
-        private float cardWidth = 240f;
-        private float cardHeight = 345f;
-        private float cardSpacing = 90f;
+        private float cardWidth = 180f; // Smaller cards for Jawaker-style
+        private float cardHeight = 260f;
+        private float cardSpacing = 45f; // Tight overlap like Jawaker
 
         [Header("State")]
         private List<CardUI> playerHandCards = new List<CardUI>();
@@ -256,25 +256,28 @@ namespace Lekha.UI
 
             // Create deck position (for dealing animation origin)
             deckPosition = CreateContainer(canvasTransform, "DeckPosition",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 200));
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 100));
 
-            // Create player hand container (bottom)
+            // Jawaker-style: Position hand containers around the oval table
+            // South (human) - bottom edge of table
             playerHandContainer = CreateContainer(canvasTransform, "PlayerHand",
-                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 170));
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 10));
 
-            // Create trick area (center)
+            // Create trick area (center of table)
             trickArea = CreateContainer(canvasTransform, "TrickArea",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
 
-            // Create other player hand indicators with better positioning
+            // West - left edge of table
             leftHandContainer = CreateContainer(canvasTransform, "LeftHand",
-                new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(120, 0));
+                new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(280, 0));
 
+            // North (partner) - top edge of table
             topHandContainer = CreateContainer(canvasTransform, "TopHand",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -120));
 
+            // East - right edge of table
             rightHandContainer = CreateContainer(canvasTransform, "RightHand",
-                new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-120, 0));
+                new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-280, 0));
 
             // Create turn indicators for each position
             CreateTurnIndicators(canvasTransform);
@@ -499,39 +502,126 @@ namespace Lekha.UI
 
         private void CreateBackground(Transform parent)
         {
-            // Casino-style felt table background
-            if (ModernUITheme.Instance != null && ModernUITheme.Instance.TableSprite != null)
-            {
-                // Deep green felt table background
-                GameObject bgObj = new GameObject("Background");
-                bgObj.transform.SetParent(parent, false);
-                Image bgImage = bgObj.AddComponent<Image>();
-                bgImage.sprite = ModernUITheme.Instance.TableSprite;
-                bgImage.type = Image.Type.Simple;
-                bgImage.preserveAspect = false;
-                bgImage.color = Color.white;
-                RectTransform bgRect = bgObj.GetComponent<RectTransform>();
-                bgRect.anchorMin = Vector2.zero;
-                bgRect.anchorMax = Vector2.one;
-                bgRect.sizeDelta = Vector2.zero;
+            // Jawaker-style: Dark outer background with oval green felt table
 
-                // Rich wood frame around the table
-                CreateWoodTableFrame(parent);
-            }
-            else
-            {
-                // Fallback to solid felt green
-                GameObject bgObj = new GameObject("Background");
-                bgObj.transform.SetParent(parent, false);
-                Image bgImage = bgObj.AddComponent<Image>();
-                bgImage.color = ModernUITheme.FeltGreen;
-                RectTransform bgRect = bgObj.GetComponent<RectTransform>();
-                bgRect.anchorMin = Vector2.zero;
-                bgRect.anchorMax = Vector2.one;
-                bgRect.sizeDelta = Vector2.zero;
+            // 1. Dark outer background (covers entire screen)
+            GameObject outerBg = new GameObject("OuterBackground");
+            outerBg.transform.SetParent(parent, false);
+            Image outerImg = outerBg.AddComponent<Image>();
+            outerImg.color = new Color(0.08f, 0.12f, 0.08f, 1f); // Dark greenish-black
+            RectTransform outerRect = outerBg.GetComponent<RectTransform>();
+            outerRect.anchorMin = Vector2.zero;
+            outerRect.anchorMax = Vector2.one;
+            outerRect.sizeDelta = Vector2.zero;
+            outerImg.raycastTarget = false;
 
-                CreateWoodTableFrame(parent);
+            // 2. Create oval table in center
+            CreateOvalTable(parent);
+        }
+
+        /// <summary>
+        /// Create Jawaker-style oval green felt table
+        /// </summary>
+        private void CreateOvalTable(Transform parent)
+        {
+            // Table dimensions (oval shape in center)
+            float tableWidth = 1400f;
+            float tableHeight = 750f;
+
+            // Create table shadow (slightly larger, darker)
+            GameObject shadowObj = new GameObject("TableShadow");
+            shadowObj.transform.SetParent(parent, false);
+            RectTransform shadowRect = shadowObj.AddComponent<RectTransform>();
+            shadowRect.anchorMin = new Vector2(0.5f, 0.5f);
+            shadowRect.anchorMax = new Vector2(0.5f, 0.5f);
+            shadowRect.sizeDelta = new Vector2(tableWidth + 30, tableHeight + 30);
+            shadowRect.anchoredPosition = new Vector2(5, -5);
+
+            Image shadowImg = shadowObj.AddComponent<Image>();
+            shadowImg.sprite = CreateOvalSprite(256, 160);
+            shadowImg.color = new Color(0, 0, 0, 0.5f);
+            shadowImg.raycastTarget = false;
+
+            // Create table border (dark green rim)
+            GameObject borderObj = new GameObject("TableBorder");
+            borderObj.transform.SetParent(parent, false);
+            RectTransform borderRect = borderObj.AddComponent<RectTransform>();
+            borderRect.anchorMin = new Vector2(0.5f, 0.5f);
+            borderRect.anchorMax = new Vector2(0.5f, 0.5f);
+            borderRect.sizeDelta = new Vector2(tableWidth + 20, tableHeight + 20);
+            borderRect.anchoredPosition = Vector2.zero;
+
+            Image borderImg = borderObj.AddComponent<Image>();
+            borderImg.sprite = CreateOvalSprite(256, 160);
+            borderImg.color = new Color(0.15f, 0.25f, 0.15f, 1f); // Dark green border
+            borderImg.raycastTarget = false;
+
+            // Create main table surface (green felt)
+            GameObject tableObj = new GameObject("TableSurface");
+            tableObj.transform.SetParent(parent, false);
+            RectTransform tableRect = tableObj.AddComponent<RectTransform>();
+            tableRect.anchorMin = new Vector2(0.5f, 0.5f);
+            tableRect.anchorMax = new Vector2(0.5f, 0.5f);
+            tableRect.sizeDelta = new Vector2(tableWidth, tableHeight);
+            tableRect.anchoredPosition = Vector2.zero;
+
+            Image tableImg = tableObj.AddComponent<Image>();
+            tableImg.sprite = CreateOvalSprite(256, 160);
+            tableImg.color = new Color(0.18f, 0.45f, 0.25f, 1f); // Jawaker green felt
+            tableImg.raycastTarget = false;
+
+            // Inner lighter highlight (subtle)
+            GameObject highlightObj = new GameObject("TableHighlight");
+            highlightObj.transform.SetParent(parent, false);
+            RectTransform highlightRect = highlightObj.AddComponent<RectTransform>();
+            highlightRect.anchorMin = new Vector2(0.5f, 0.5f);
+            highlightRect.anchorMax = new Vector2(0.5f, 0.5f);
+            highlightRect.sizeDelta = new Vector2(tableWidth - 100, tableHeight - 60);
+            highlightRect.anchoredPosition = Vector2.zero;
+
+            Image highlightImg = highlightObj.AddComponent<Image>();
+            highlightImg.sprite = CreateOvalSprite(256, 160);
+            highlightImg.color = new Color(0.22f, 0.52f, 0.30f, 0.4f); // Lighter center
+            highlightImg.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// Create an oval/ellipse sprite programmatically
+        /// </summary>
+        private Sprite CreateOvalSprite(int width, int height)
+        {
+            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            float cx = width / 2f;
+            float cy = height / 2f;
+            float rx = width / 2f;
+            float ry = height / 2f;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    // Ellipse equation: (x-cx)^2/rx^2 + (y-cy)^2/ry^2 <= 1
+                    float dx = (x - cx) / rx;
+                    float dy = (y - cy) / ry;
+                    float dist = dx * dx + dy * dy;
+
+                    if (dist <= 1f)
+                    {
+                        // Inside ellipse - smooth edge with anti-aliasing
+                        float alpha = dist > 0.95f ? (1f - dist) / 0.05f : 1f;
+                        tex.SetPixel(x, y, new Color(1, 1, 1, alpha));
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                }
             }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100f);
         }
 
         private void CreateWoodTableFrame(Transform parent)
@@ -1398,13 +1488,17 @@ namespace Lekha.UI
             CardUI cardUI = CreateCardUI(card, trickArea);
             trickCards.Add(cardUI);
 
-            // Position based on player
+            // Jawaker-style: overlapping cards in center
+            // Cards stack with slight offset based on play order
+            int cardIndex = trickCards.Count - 1; // 0-based index for this card
+            float baseOffset = 25f; // Offset per card
             Vector2 pos = player.Position switch
             {
-                PlayerPosition.South => new Vector2(0, -110),
-                PlayerPosition.West => new Vector2(-150, 0),
-                PlayerPosition.North => new Vector2(0, 110),
-                PlayerPosition.East => new Vector2(150, 0),
+                // Stack cards with slight directional offset from player position
+                PlayerPosition.South => new Vector2(baseOffset * cardIndex * 0.3f, -30 + cardIndex * 10),
+                PlayerPosition.West => new Vector2(-40 + cardIndex * 15, baseOffset * cardIndex * 0.3f),
+                PlayerPosition.North => new Vector2(-baseOffset * cardIndex * 0.3f, 30 - cardIndex * 10),
+                PlayerPosition.East => new Vector2(40 - cardIndex * 15, -baseOffset * cardIndex * 0.3f),
                 _ => Vector2.zero
             };
 
@@ -1514,12 +1608,13 @@ namespace Lekha.UI
 
         private Vector2 GetPlayerStartPosition(PlayerPosition position)
         {
+            // Jawaker-style: cards animate from player positions around the table
             return position switch
             {
-                PlayerPosition.South => new Vector2(0, -300),
-                PlayerPosition.West => new Vector2(-400, 0),
-                PlayerPosition.North => new Vector2(0, 300),
-                PlayerPosition.East => new Vector2(400, 0),
+                PlayerPosition.South => new Vector2(0, -250),
+                PlayerPosition.West => new Vector2(-350, 0),
+                PlayerPosition.North => new Vector2(0, 250),
+                PlayerPosition.East => new Vector2(350, 0),
                 _ => Vector2.zero
             };
         }

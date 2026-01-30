@@ -572,38 +572,37 @@ namespace Lekha.UI
 
         private void PositionInCorner()
         {
-            // Position panels in screen corners based on player position
-            float edgeOffset = 20f;
-            float bottomOffset = 120f; // Extra space for player's hand at bottom
+            // Jawaker-style: Position panels around the oval table (not in corners)
+            // Players are positioned at the edge of the table facing the center
 
             switch (position)
             {
-                case PlayerPosition.South: // Human player - bottom left
-                    panelRect.anchorMin = new Vector2(0, 0);
-                    panelRect.anchorMax = new Vector2(0, 0);
-                    panelRect.pivot = new Vector2(0, 0);
-                    panelRect.anchoredPosition = new Vector2(edgeOffset, bottomOffset);
+                case PlayerPosition.South: // Human player - bottom center of table
+                    panelRect.anchorMin = new Vector2(0.5f, 0);
+                    panelRect.anchorMax = new Vector2(0.5f, 0);
+                    panelRect.pivot = new Vector2(0.5f, 0);
+                    panelRect.anchoredPosition = new Vector2(0, 80); // Just above the hand
                     break;
 
-                case PlayerPosition.West: // Left side - top left
-                    panelRect.anchorMin = new Vector2(0, 1);
-                    panelRect.anchorMax = new Vector2(0, 1);
-                    panelRect.pivot = new Vector2(0, 1);
-                    panelRect.anchoredPosition = new Vector2(edgeOffset, -edgeOffset);
+                case PlayerPosition.West: // Left side - left center of table
+                    panelRect.anchorMin = new Vector2(0, 0.5f);
+                    panelRect.anchorMax = new Vector2(0, 0.5f);
+                    panelRect.pivot = new Vector2(0, 0.5f);
+                    panelRect.anchoredPosition = new Vector2(40, 0);
                     break;
 
-                case PlayerPosition.North: // Partner - top right
-                    panelRect.anchorMin = new Vector2(1, 1);
-                    panelRect.anchorMax = new Vector2(1, 1);
-                    panelRect.pivot = new Vector2(1, 1);
-                    panelRect.anchoredPosition = new Vector2(-edgeOffset, -edgeOffset);
+                case PlayerPosition.North: // Partner - top center of table
+                    panelRect.anchorMin = new Vector2(0.5f, 1);
+                    panelRect.anchorMax = new Vector2(0.5f, 1);
+                    panelRect.pivot = new Vector2(0.5f, 1);
+                    panelRect.anchoredPosition = new Vector2(0, -30);
                     break;
 
-                case PlayerPosition.East: // Right side - bottom right
-                    panelRect.anchorMin = new Vector2(1, 0);
-                    panelRect.anchorMax = new Vector2(1, 0);
-                    panelRect.pivot = new Vector2(1, 0);
-                    panelRect.anchoredPosition = new Vector2(-edgeOffset, bottomOffset);
+                case PlayerPosition.East: // Right side - right center of table
+                    panelRect.anchorMin = new Vector2(1, 0.5f);
+                    panelRect.anchorMax = new Vector2(1, 0.5f);
+                    panelRect.pivot = new Vector2(1, 0.5f);
+                    panelRect.anchoredPosition = new Vector2(-40, 0);
                     break;
             }
         }
