@@ -69,8 +69,8 @@ namespace Lekha.UI
         {
             canvasGroup = gameObject.AddComponent<CanvasGroup>();
 
-            // Panel size - larger for better readability
-            Vector2 panelSize = new Vector2(220, 90);
+            // Panel size - LARGE with prominent avatar
+            Vector2 panelSize = new Vector2(200, 100);
             panelRect.sizeDelta = panelSize;
 
             // Turn glow (behind everything)
@@ -176,8 +176,8 @@ namespace Lekha.UI
 
         private void CreateAvatar()
         {
-            float avatarSize = 56f;
-            float leftPadding = 20f;
+            float avatarSize = 80f; // LARGE avatar
+            float leftPadding = 10f;
 
             // Avatar container
             GameObject avatarObj = new GameObject("Avatar");
@@ -391,8 +391,8 @@ namespace Lekha.UI
 
         private void CreateInfoSection()
         {
-            float leftOffset = 84f; // After avatar
-            float rightPadding = 12f;
+            float leftOffset = 95f; // After large avatar
+            float rightPadding = 8f;
 
             // Name text
             GameObject nameObj = new GameObject("Name");
@@ -572,37 +572,37 @@ namespace Lekha.UI
 
         private void PositionInCorner()
         {
-            // Jawaker-style: Position panels around the oval table (not in corners)
-            // Players are positioned at the edge of the table facing the center
+            // CLEAN LAYOUT: Position panels above each player's card area
+            // Ensures NO OVERLAP with cards
 
             switch (position)
             {
-                case PlayerPosition.South: // Human player - bottom center of table
+                case PlayerPosition.South: // Human player - ABOVE cards, bottom center
                     panelRect.anchorMin = new Vector2(0.5f, 0);
                     panelRect.anchorMax = new Vector2(0.5f, 0);
                     panelRect.pivot = new Vector2(0.5f, 0);
-                    panelRect.anchoredPosition = new Vector2(0, 80); // Just above the hand
+                    panelRect.anchoredPosition = new Vector2(0, 280); // High enough to be above cards
                     break;
 
-                case PlayerPosition.West: // Left side - left center of table
+                case PlayerPosition.West: // Left side - above card backs
                     panelRect.anchorMin = new Vector2(0, 0.5f);
                     panelRect.anchorMax = new Vector2(0, 0.5f);
                     panelRect.pivot = new Vector2(0, 0.5f);
-                    panelRect.anchoredPosition = new Vector2(40, 0);
+                    panelRect.anchoredPosition = new Vector2(20, 80); // Left edge, slightly up
                     break;
 
-                case PlayerPosition.North: // Partner - top center of table
+                case PlayerPosition.North: // Partner - top center, above card backs
                     panelRect.anchorMin = new Vector2(0.5f, 1);
                     panelRect.anchorMax = new Vector2(0.5f, 1);
                     panelRect.pivot = new Vector2(0.5f, 1);
-                    panelRect.anchoredPosition = new Vector2(0, -30);
+                    panelRect.anchoredPosition = new Vector2(0, -20); // Near top
                     break;
 
-                case PlayerPosition.East: // Right side - right center of table
+                case PlayerPosition.East: // Right side - above card backs
                     panelRect.anchorMin = new Vector2(1, 0.5f);
                     panelRect.anchorMax = new Vector2(1, 0.5f);
                     panelRect.pivot = new Vector2(1, 0.5f);
-                    panelRect.anchoredPosition = new Vector2(-40, 0);
+                    panelRect.anchoredPosition = new Vector2(-20, 80); // Right edge, slightly up
                     break;
             }
         }

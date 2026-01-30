@@ -256,54 +256,56 @@ namespace Lekha.UI
 
             // Create deck position (for dealing animation origin)
             deckPosition = CreateContainer(canvasTransform, "DeckPosition",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 100));
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 50));
 
-            // Jawaker-style: Position hand containers around the oval table
-            // South (human) - bottom edge of table
+            // CLEAN LAYOUT: Position hand containers to avoid overlaps
+            // South (human) - lower third of screen, cards at very bottom
             playerHandContainer = CreateContainer(canvasTransform, "PlayerHand",
-                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 10));
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 30));
 
             // Create trick area (center of table)
             trickArea = CreateContainer(canvasTransform, "TrickArea",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero);
 
-            // West - left edge of table
+            // West - left side, card backs area
             leftHandContainer = CreateContainer(canvasTransform, "LeftHand",
-                new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(280, 0));
+                new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(180, -40));
 
-            // North (partner) - top edge of table
+            // North (partner) - top area, card backs
             topHandContainer = CreateContainer(canvasTransform, "TopHand",
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -120));
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -180));
 
-            // East - right edge of table
+            // East - right side, card backs area
             rightHandContainer = CreateContainer(canvasTransform, "RightHand",
-                new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-280, 0));
+                new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-180, -40));
 
             // Create turn indicators for each position
             CreateTurnIndicators(canvasTransform);
 
-            // Create instruction text - centered above play area
+            // Create instruction text - CENTER OF TABLE
             instructionText = CreateInstructionText(canvasTransform);
 
-            // Create score panel at top center
-            CreateScorePanel(canvasTransform);
-
-            // Create round text - top left corner
+            // Create round text - TOP LEFT corner
             roundText = CreateRoundText(canvasTransform);
 
-            // Create buttons with better styling
+            // Score tracker (hidden - scores shown in player panels and popup)
+            CreateScoreTracker(canvasTransform);
+
+            // Create buttons - START hidden, PASS centered on table
             startButton = CreateStyledButton(canvasTransform, "StartButton",
                 new Vector2(0.5f, 0.5f), "Start Game", OnStartClicked);
             startButton.gameObject.SetActive(false); // Hidden - MainMenu handles starting
 
+            // Pass button - CENTER OF TABLE
             passButton = CreateStyledButton(canvasTransform, "PassButton",
-                new Vector2(0.5f, 0.25f), "Pass Cards (0/3)", OnPassClicked);
+                new Vector2(0.5f, 0.5f), "Pass Cards (0/3)", OnPassClicked);
+            passButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0, 40); // Slightly above center
             passButton.gameObject.SetActive(false);
 
             // Create pause button (top right corner)
             pauseButton = CreatePauseButton(canvasTransform);
 
-            // Create score summary button (next to pause)
+            // Create score summary button (next to pause) - opens score popup
             scoreButton = CreateScoreButton(canvasTransform);
 
             // Create score summary popup
@@ -378,8 +380,8 @@ namespace Lekha.UI
             RectTransform rect = btnObj.AddComponent<RectTransform>();
             rect.anchorMin = new Vector2(1, 1);
             rect.anchorMax = new Vector2(1, 1);
-            rect.anchoredPosition = new Vector2(-120, -135); // Moved below score panel
-            rect.sizeDelta = new Vector2(52, 52);
+            rect.anchoredPosition = new Vector2(-120, -30); // Top right, next to pause
+            rect.sizeDelta = new Vector2(50, 50);
 
             Image img = btnObj.AddComponent<Image>();
 
@@ -443,8 +445,8 @@ namespace Lekha.UI
             RectTransform rect = btnObj.AddComponent<RectTransform>();
             rect.anchorMin = new Vector2(1, 1);
             rect.anchorMax = new Vector2(1, 1);
-            rect.anchoredPosition = new Vector2(-55, -135); // Moved below score panel
-            rect.sizeDelta = new Vector2(52, 52);
+            rect.anchoredPosition = new Vector2(-60, -30); // Top right corner
+            rect.sizeDelta = new Vector2(50, 50);
 
             Image img = btnObj.AddComponent<Image>();
 
@@ -767,61 +769,32 @@ namespace Lekha.UI
             }
         }
 
-        private void CreateScorePanel(Transform parent)
+        private void CreateScoreTracker(Transform parent)
         {
-            // Score panel showing all 4 individual player scores
-            GameObject panelObj = new GameObject("ScorePanel");
-            panelObj.transform.SetParent(parent, false);
-
-            RectTransform panelRect = panelObj.AddComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.5f, 1f);
-            panelRect.anchorMax = new Vector2(0.5f, 1f);
-            panelRect.anchoredPosition = new Vector2(0, -70);
-            panelRect.sizeDelta = new Vector2(560, 80);
-
-            Image panelImg = panelObj.AddComponent<Image>();
-            if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
-            {
-                panelImg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
-                panelImg.type = Image.Type.Sliced;
-            }
-            panelImg.color = new Color(0.06f, 0.04f, 0.02f, 0.95f);
-
-            Shadow shadow = panelObj.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.6f);
-            shadow.effectDistance = new Vector2(0, -5);
-
-            Outline outline = panelObj.AddComponent<Outline>();
-            outline.effectColor = new Color(ModernUITheme.GoldAccent.r, ModernUITheme.GoldAccent.g, ModernUITheme.GoldAccent.b, 0.6f);
-            outline.effectDistance = new Vector2(2f, -2f);
-
-            // Score text showing all 4 players
-            GameObject textObj = new GameObject("ScoreText");
-            textObj.transform.SetParent(panelObj.transform, false);
+            // Hidden score tracker - scores are shown in popup and player panels
+            GameObject textObj = new GameObject("ScoreTracker");
+            textObj.transform.SetParent(parent, false);
             RectTransform textRect = textObj.AddComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
+            textRect.anchorMax = Vector2.zero;
             textRect.sizeDelta = Vector2.zero;
 
             scoreText = textObj.AddComponent<TextMeshProUGUI>();
-            scoreText.text = "S:0  E:0  N:0  W:0";
-            scoreText.fontSize = 30;
-            scoreText.fontStyle = FontStyles.Bold;
-            scoreText.alignment = TextAlignmentOptions.Center;
-            scoreText.color = ModernUITheme.TextPrimary;
-            scoreText.textWrappingMode = TextWrappingModes.NoWrap;
+            scoreText.text = "";
+            scoreText.fontSize = 1;
+            scoreText.gameObject.SetActive(false); // Hidden - just for tracking
         }
 
         private TextMeshProUGUI CreateInstructionText(Transform parent)
         {
-            // Elegant instruction panel
+            // Instruction panel - CENTERED ON TABLE
             GameObject bgObj = new GameObject("Instructions_BG");
             bgObj.transform.SetParent(parent, false);
             RectTransform bgRect = bgObj.AddComponent<RectTransform>();
-            bgRect.anchorMin = new Vector2(0.5f, 0.78f);
-            bgRect.anchorMax = new Vector2(0.5f, 0.78f);
-            bgRect.anchoredPosition = Vector2.zero;
-            bgRect.sizeDelta = new Vector2(500, 56);
+            bgRect.anchorMin = new Vector2(0.5f, 0.5f);
+            bgRect.anchorMax = new Vector2(0.5f, 0.5f);
+            bgRect.anchoredPosition = new Vector2(0, 120); // Above center, on table
+            bgRect.sizeDelta = new Vector2(450, 50);
 
             Image bgImg = bgObj.AddComponent<Image>();
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
@@ -829,11 +802,11 @@ namespace Lekha.UI
                 bgImg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
                 bgImg.type = Image.Type.Sliced;
             }
-            bgImg.color = new Color(0.05f, 0.03f, 0.02f, 0.88f);
+            bgImg.color = new Color(0.02f, 0.02f, 0.02f, 0.75f);
 
             Shadow shadow = bgObj.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.4f);
-            shadow.effectDistance = new Vector2(0, -3);
+            shadow.effectColor = new Color(0, 0, 0, 0.5f);
+            shadow.effectDistance = new Vector2(0, -2);
 
             GameObject textObj = new GameObject("Instructions");
             textObj.transform.SetParent(bgObj.transform, false);
@@ -844,7 +817,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = "";
-            tmp.fontSize = 28;
+            tmp.fontSize = 24;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = ModernUITheme.TextPrimary;
@@ -854,14 +827,14 @@ namespace Lekha.UI
 
         private TextMeshProUGUI CreateRoundText(Transform parent)
         {
-            // Round indicator - top center, small
+            // Round indicator - TOP LEFT CORNER
             GameObject bgObj = new GameObject("Round_BG");
             bgObj.transform.SetParent(parent, false);
             RectTransform bgRect = bgObj.AddComponent<RectTransform>();
-            bgRect.anchorMin = new Vector2(0.5f, 1f);
-            bgRect.anchorMax = new Vector2(0.5f, 1f);
-            bgRect.anchoredPosition = new Vector2(0, -28);
-            bgRect.sizeDelta = new Vector2(120, 32);
+            bgRect.anchorMin = new Vector2(0f, 1f);
+            bgRect.anchorMax = new Vector2(0f, 1f);
+            bgRect.anchoredPosition = new Vector2(80, -30);
+            bgRect.sizeDelta = new Vector2(120, 36);
 
             Image bgImg = bgObj.AddComponent<Image>();
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
@@ -1275,13 +1248,107 @@ namespace Lekha.UI
 
         private void DisplayOtherPlayersCardCount()
         {
-            // Update player info panels instead of old labels
+            // Update player info panels
             UpdatePlayerInfoPanels();
 
-            // Clear old containers (backwards compatibility)
+            // Display small card backs for opponents
+            DisplayOpponentCardBacks();
+        }
+
+        /// <summary>
+        /// Display small card backs for opponent players (shows card count visually)
+        /// </summary>
+        private void DisplayOpponentCardBacks()
+        {
+            // Clear old card backs
             ClearContainer(leftHandContainer);
             ClearContainer(topHandContainer);
             ClearContainer(rightHandContainer);
+
+            if (GameManager.Instance == null || GameManager.Instance.Players == null) return;
+
+            // Card back size (smaller than player cards)
+            float backWidth = 45f;
+            float backHeight = 65f;
+            float overlap = 12f; // Heavy overlap for compact look
+
+            foreach (var player in GameManager.Instance.Players)
+            {
+                if (player.IsHuman) continue; // Skip human player
+
+                RectTransform container = player.Position switch
+                {
+                    PlayerPosition.West => leftHandContainer,
+                    PlayerPosition.North => topHandContainer,
+                    PlayerPosition.East => rightHandContainer,
+                    _ => null
+                };
+
+                if (container == null) continue;
+
+                int cardCount = player.Hand.Count;
+                float totalWidth = (cardCount - 1) * overlap + backWidth;
+                float startX = -totalWidth / 2 + backWidth / 2;
+
+                // Create card backs (limit display to avoid clutter)
+                int displayCount = Mathf.Min(cardCount, 13);
+                for (int i = 0; i < displayCount; i++)
+                {
+                    CreateCardBack(container, backWidth, backHeight, startX + i * overlap, player.Position);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Create a single card back image
+        /// </summary>
+        private void CreateCardBack(RectTransform parent, float width, float height, float xPos, PlayerPosition position)
+        {
+            GameObject backObj = new GameObject("CardBack");
+            backObj.transform.SetParent(parent, false);
+
+            RectTransform rect = backObj.AddComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(width, height);
+
+            // Position based on player position (horizontal or vertical layout)
+            if (position == PlayerPosition.North)
+            {
+                rect.anchoredPosition = new Vector2(xPos, 0);
+            }
+            else if (position == PlayerPosition.West)
+            {
+                // Rotate for left side - vertical stack
+                rect.anchoredPosition = new Vector2(0, xPos);
+                rect.localRotation = Quaternion.Euler(0, 0, 90);
+            }
+            else if (position == PlayerPosition.East)
+            {
+                // Rotate for right side - vertical stack
+                rect.anchoredPosition = new Vector2(0, -xPos);
+                rect.localRotation = Quaternion.Euler(0, 0, -90);
+            }
+
+            Image img = backObj.AddComponent<Image>();
+
+            // Try to load card back sprite, fallback to color
+            Sprite cardBackSprite = Resources.Load<Sprite>("Cards/CardBack");
+            if (cardBackSprite != null)
+            {
+                img.sprite = cardBackSprite;
+                img.color = Color.white;
+            }
+            else
+            {
+                // Fallback: dark card back with pattern
+                img.color = new Color(0.15f, 0.25f, 0.45f, 1f); // Dark blue
+            }
+
+            img.raycastTarget = false;
+
+            // Add subtle shadow
+            Shadow shadow = backObj.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, 0.4f);
+            shadow.effectDistance = new Vector2(1, -1);
         }
 
         /// <summary>
@@ -2168,31 +2235,9 @@ namespace Lekha.UI
 
         private void UpdateScoreText()
         {
-            // Show all 4 individual player scores
-            var players = GameManager.Instance.Players;
-            string[] parts = new string[4];
-            for (int i = 0; i < 4; i++)
-            {
-                // Use short name (first word or position initial)
-                string shortName = GetShortPlayerName(players[i]);
-                int score = players[i].TotalPoints;
-                // Highlight in red if approaching 101
-                if (score >= 80)
-                    parts[i] = $"<color=#FF4444>{shortName}:{score}</color>";
-                else
-                    parts[i] = $"{shortName}:{score}";
-            }
-            scoreText.text = string.Join("  ", parts);
-            scoreText.richText = true;
-
-            // Update player info panels
+            // Scores are now shown in player info panels and score popup
+            // Update player info panels with current scores
             UpdatePlayerInfoPanels();
-
-            // Pulse score on update
-            if (CardAnimator.Instance != null)
-            {
-                CardAnimator.Instance.PunchScale(scoreText.GetComponent<RectTransform>(), 0.15f);
-            }
         }
 
         private string GetShortPlayerName(Player player)
