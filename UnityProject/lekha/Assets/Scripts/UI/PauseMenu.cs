@@ -110,7 +110,7 @@ namespace Lekha.UI
             panelRect.sizeDelta = Vector2.zero;
 
             Image bg = pausePanel.AddComponent<Image>();
-            bg.color = new Color(0.02f, 0.03f, 0.06f, 0.85f);
+            bg.color = new Color(0.04f, 0.05f, 0.10f, 0.88f); // Modern dark overlay
 
             // Click overlay to resume (optional - can be removed if not desired)
             Button overlayBtn = pausePanel.AddComponent<Button>();
@@ -132,25 +132,30 @@ namespace Lekha.UI
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
             {
                 centerImg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
-                centerImg.color = new Color(0.08f, 0.09f, 0.14f, 0.95f);
+                centerImg.color = new Color(0.12f, 0.14f, 0.22f, 0.95f); // Modern glass
                 centerImg.type = Image.Type.Sliced;
             }
             else if (PremiumVisuals.Instance != null && PremiumVisuals.Instance.PanelSprite != null)
             {
                 centerImg.sprite = PremiumVisuals.Instance.PanelSprite;
-                centerImg.color = Color.white;
+                centerImg.color = new Color(0.12f, 0.14f, 0.22f, 0.95f);
                 centerImg.type = Image.Type.Sliced;
             }
             else
             {
-                centerImg.color = new Color(0.08f, 0.09f, 0.14f, 0.95f);
+                centerImg.color = new Color(0.12f, 0.14f, 0.22f, 0.95f);
             }
 
             Shadow shadow = centerPanel.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.5f);
-            shadow.effectDistance = new Vector2(0, -8);
+            shadow.effectColor = new Color(0, 0, 0, 0.4f);
+            shadow.effectDistance = new Vector2(0, -6);
 
-            // Gold accent line at top
+            // Add cyan glow outline
+            Outline outline = centerPanel.AddComponent<Outline>();
+            outline.effectColor = new Color(0.40f, 0.75f, 1f, 0.15f);
+            outline.effectDistance = new Vector2(2, -2);
+
+            // Cyan accent line at top
             GameObject accentLine = new GameObject("AccentLine");
             accentLine.transform.SetParent(centerPanel.transform, false);
             RectTransform accentRect = accentLine.AddComponent<RectTransform>();
@@ -159,7 +164,7 @@ namespace Lekha.UI
             accentRect.sizeDelta = new Vector2(0, 3);
             accentRect.anchoredPosition = new Vector2(0, -1);
             Image accentImg = accentLine.AddComponent<Image>();
-            accentImg.color = ModernUITheme.AccentGold;
+            accentImg.color = new Color(0.40f, 0.75f, 1f, 1f); // Cyan accent
 
             // Title with icon
             CreateTitleSection(centerPanel.transform);
@@ -212,7 +217,7 @@ namespace Lekha.UI
             {
                 iconBg.sprite = ModernUITheme.Instance.CircleSprite;
             }
-            iconBg.color = ModernUITheme.AccentGold;
+            iconBg.color = new Color(0.85f, 0.45f, 0.95f, 1f); // Magenta accent
 
             // Pause symbol
             TextMeshProUGUI iconText = ModernUITheme.CreateText(iconObj.transform, "⏸", 26, ModernUITheme.PrimaryDark);
@@ -284,11 +289,12 @@ namespace Lekha.UI
             }
             else
             {
-                img.color = ModernUITheme.AccentGold;
+                Color accentCyan = new Color(0.40f, 0.75f, 1f, 1f);
+                img.color = accentCyan;
                 ColorBlock colors = btn.colors;
-                colors.normalColor = ModernUITheme.AccentGold;
-                colors.highlightedColor = new Color(1f, 0.85f, 0.4f, 1f);
-                colors.pressedColor = ModernUITheme.AccentGoldDark;
+                colors.normalColor = accentCyan;
+                colors.highlightedColor = new Color(0.55f, 0.85f, 1f, 1f);
+                colors.pressedColor = new Color(0.30f, 0.60f, 0.85f, 1f);
                 btn.colors = colors;
             }
 

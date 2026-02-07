@@ -6,8 +6,10 @@
 [Bb]uilds/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
-.utmp/
-*.utmp/
+**/.utmp/
+
+# Server is a separate repo
+Server/
 
 # MemoryCaptures can get excessive in size
 [Mm]emoryCaptures/

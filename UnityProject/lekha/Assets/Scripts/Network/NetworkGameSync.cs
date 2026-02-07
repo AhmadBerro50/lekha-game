@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Lekha.Core;
 using Lekha.GameLogic;
 using Lekha.UI;
+using Lekha.AI;
 
 namespace Lekha.Network
 {
@@ -151,6 +152,11 @@ namespace Lekha.Network
         public event Action<RoundEndData> OnRoundEndReceived;
         public event Action<Team> OnGameOverReceived;
 
+        // Disconnect notification events (for UI)
+        public event Action<PlayerPosition, string, float> OnPlayerDisconnectedUI;  // pos, name, timeoutSeconds
+        public event Action<PlayerPosition, string> OnPlayerReconnectedUI;  // pos, name
+        public event Action<PlayerPosition, string> OnBotReplacedUI;  // pos, name
+
         // Pending actions queue
         private Queue<Action> pendingActions = new Queue<Action>();
 
@@ -172,6 +178,10 @@ namespace Lekha.Network
             {
                 NetworkManager.Instance.OnMessageReceived += OnNetworkMessageReceived;
                 NetworkManager.Instance.OnGameStarted += OnGameStarted;
+                NetworkManager.Instance.OnPlayerDisconnected += HandlePlayerDisconnected;
+                NetworkManager.Instance.OnPlayerReconnected += HandlePlayerReconnected;
+                NetworkManager.Instance.OnBotReplaced += HandleBotReplaced;
+                NetworkManager.Instance.OnRoomUpdated += HandleRoomUpdatedForHostTransfer;
             }
         }
 
@@ -181,6 +191,10 @@ namespace Lekha.Network
             {
                 NetworkManager.Instance.OnMessageReceived -= OnNetworkMessageReceived;
                 NetworkManager.Instance.OnGameStarted -= OnGameStarted;
+                NetworkManager.Instance.OnPlayerDisconnected -= HandlePlayerDisconnected;
+                NetworkManager.Instance.OnPlayerReconnected -= HandlePlayerReconnected;
+                NetworkManager.Instance.OnBotReplaced -= HandleBotReplaced;
+                NetworkManager.Instance.OnRoomUpdated -= HandleRoomUpdatedForHostTransfer;
             }
         }
 
@@ -234,31 +248,10 @@ namespace Lekha.Network
                 // Set player names in GameManager from network data
                 SetNetworkPlayerNamesInGameManager(room);
 
-                // Create and show in-game voice chat UI for online games
-                CreateInGameVoiceChatUI();
+                // Show ping display for online games
+                if (PingDisplay.Instance != null)
+                    PingDisplay.Instance.Show();
             }
-        }
-
-        /// <summary>
-        /// Create the in-game voice chat UI for online multiplayer
-        /// </summary>
-        private void CreateInGameVoiceChatUI()
-        {
-            // Voice chat is disabled - don't create UI
-            if (VoiceChatManager.VOICE_CHAT_DISABLED)
-            {
-                return;
-            }
-
-            if (InGameVoiceChatUI.Instance == null)
-            {
-                GameObject voiceUIObj = new GameObject("InGameVoiceChatUI");
-                voiceUIObj.AddComponent<InGameVoiceChatUI>();
-                Debug.Log("[NetworkGameSync] InGameVoiceChatUI created");
-            }
-
-            // Show the voice chat UI
-            InGameVoiceChatUI.Instance?.Show();
         }
 
         /// <summary>
@@ -632,6 +625,133 @@ namespace Lekha.Network
             Reset();
         }
 
+        // --- Disconnect handling ---
+
+        public void SetHost(bool hosting)
+        {
+            isHost = hosting;
+            Debug.Log($"[NetworkGameSync] Host status changed to: {hosting}");
+        }
+
+        private void HandlePlayerDisconnected(PlayerDisconnectInfo info)
+        {
+            if (!isOnlineGame) return;
+
+            if (Enum.TryParse<PlayerPosition>(info.Position, out PlayerPosition pos))
+            {
+                GameManager.Instance?.MarkPlayerDisconnected(pos);
+                float timeoutSeconds = info.ReconnectTimeout / 1000f;
+                OnPlayerDisconnectedUI?.Invoke(pos, info.Name, timeoutSeconds);
+                Debug.Log($"[NetworkGameSync] Player {info.Name} at {pos} disconnected. Timeout: {timeoutSeconds}s");
+
+                // If it's the disconnected player's turn, host should play for them
+                TriggerAIIfNeeded();
+            }
+        }
+
+        private void HandlePlayerReconnected(NetworkPlayer player)
+        {
+            if (!isOnlineGame) return;
+
+            if (player.Position.HasValue)
+            {
+                PlayerPosition pos = player.Position.Value;
+                GameManager.Instance?.MarkPlayerReconnected(pos);
+                OnPlayerReconnectedUI?.Invoke(pos, player.DisplayName);
+                Debug.Log($"[NetworkGameSync] Player {player.DisplayName} reconnected at {pos}");
+
+                // Cancel any pending AI play for this position
+                if (GameUI.Instance != null && GameManager.Instance != null &&
+                    GameManager.Instance.CurrentPlayer.Position == pos)
+                {
+                    GameUI.Instance.CancelPendingAIPlay();
+                }
+            }
+        }
+
+        private void HandleBotReplaced(BotReplacedData data)
+        {
+            if (!isOnlineGame) return;
+
+            if (Enum.TryParse<PlayerPosition>(data.Position, out PlayerPosition pos))
+            {
+                GameManager.Instance?.ReplacePlayerWithBot(pos);
+                OnBotReplacedUI?.Invoke(pos, data.Name);
+                Debug.Log($"[NetworkGameSync] Player {data.Name} at {pos} replaced by bot");
+
+                // Trigger AI play if it's now the bot's turn
+                TriggerAIIfNeeded();
+            }
+        }
+
+        private void HandleRoomUpdatedForHostTransfer(GameRoom room)
+        {
+            if (!isOnlineGame) return;
+
+            // Check if host status changed (host transfer after disconnect)
+            var localPlayer = NetworkManager.Instance?.LocalPlayer;
+            if (localPlayer != null && localPlayer.IsHost && !isHost)
+            {
+                Debug.Log("[NetworkGameSync] Host transferred to us!");
+                SetHost(true);
+                TriggerAIIfNeeded();
+            }
+        }
+
+        /// <summary>
+        /// If we're host and current player is disconnected/bot, trigger AI play
+        /// </summary>
+        public void TriggerAIIfNeeded()
+        {
+            if (!isOnlineGame || !isHost) return;
+            if (GameManager.Instance == null) return;
+
+            PlayerPosition currentPos = GameManager.Instance.CurrentPlayer.Position;
+            if (!GameManager.Instance.ShouldHostPlayForPosition(currentPos)) return;
+
+            if (GameManager.Instance.CurrentState == GameState.PlayingTricks)
+            {
+                Debug.Log($"[NetworkGameSync] Triggering AI play for disconnected player at {currentPos}");
+                GameUI.Instance?.TriggerDisconnectedPlayerAI();
+            }
+            else if (GameManager.Instance.CurrentState == GameState.PassingCards)
+            {
+                Debug.Log($"[NetworkGameSync] Triggering AI pass for disconnected player at {currentPos}");
+                AutoPassForDisconnectedPlayers();
+            }
+        }
+
+        /// <summary>
+        /// HOST: Auto-pass cards for all disconnected/bot players during pass phase
+        /// </summary>
+        public void AutoPassForDisconnectedPlayers()
+        {
+            if (!isOnlineGame || !isHost) return;
+            if (GameManager.Instance == null) return;
+
+            var allPositions = new List<PlayerPosition>();
+            foreach (var pos in GameManager.Instance.DisconnectedPositions) allPositions.Add(pos);
+            foreach (var pos in GameManager.Instance.BotReplacedPositions) allPositions.Add(pos);
+
+            foreach (PlayerPosition pos in allPositions)
+            {
+                Player player = GameManager.Instance.GetPlayerAtPosition(pos);
+                if (player == null || player.Hand.Count < 3) continue;
+
+                List<Card> passCards = AIPlayer.ChooseCardsToPass(player);
+                if (passCards == null || passCards.Count != 3) continue;
+
+                PlayerPosition toPos = Player.GetPlayerToRight(pos);
+
+                // Remove cards from hand locally
+                player.RemoveCards(passCards);
+
+                // Send pass cards over network
+                SendPassCards(pos, toPos, passCards);
+                Debug.Log($"[NetworkGameSync] AI passed 3 cards for disconnected {pos} -> {toPos}");
+            }
+        }
+
         /// <summary>
         /// Reset for new game
         /// </summary>
@@ -642,6 +762,10 @@ namespace Lekha.Network
             localPosition = null;
             currentNetworkState = null;
             pendingActions.Clear();
+
+            // Hide ping display when leaving online game
+            if (PingDisplay.Instance != null)
+                PingDisplay.Instance.Hide();
         }
 
         /// <summary>

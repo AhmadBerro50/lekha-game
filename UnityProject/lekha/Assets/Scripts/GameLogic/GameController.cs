@@ -34,7 +34,7 @@ namespace Lekha.GameLogic
             // Initialize player profile manager
             InitializeProfileManager();
 
-            // Initialize voice chat manager
+            // Initialize voice chat manager (Agora)
             InitializeVoiceChatManager();
 
             // Initialize network game sync (for online multiplayer)
@@ -65,13 +65,6 @@ namespace Lekha.GameLogic
 
         private void InitializeVoiceChatManager()
         {
-            // Voice chat is disabled - don't create manager
-            if (VoiceChatManager.VOICE_CHAT_DISABLED)
-            {
-                Debug.Log("[GameController] Voice chat is disabled, skipping VoiceChatManager initialization");
-                return;
-            }
-
             if (VoiceChatManager.Instance == null)
             {
                 GameObject voiceChatObj = new GameObject("VoiceChatManager");
@@ -148,6 +141,10 @@ namespace Lekha.GameLogic
                     GameManager.Instance.ConfigureForOnlineGame(localPosition);
                 }
 
+                // Show ping display for online games
+                if (PingDisplay.Instance != null)
+                    PingDisplay.Instance.Show();
+
                 // Ensure network events are subscribed (may be null during Start())
                 EnsureNetworkEventSubscription();
 
@@ -170,9 +167,9 @@ namespace Lekha.GameLogic
                     GameManager.Instance.PrepareForOnlineGame();
                 }
 
-                // Create voice chat UI and enable voice by default
+                // Join Agora voice channel and show UI
+                JoinVoiceChat();
                 CreateInGameVoiceChatUI();
-                EnableVoiceChatByDefault();
             }
             else
             {
@@ -202,14 +199,20 @@ namespace Lekha.GameLogic
             GameManager.Instance.SetNetworkPlayerNames(playerNames);
         }
 
+        private void JoinVoiceChat()
+        {
+            var roomId = NetworkManager.Instance?.CurrentRoom?.RoomId;
+            if (string.IsNullOrEmpty(roomId)) return;
+
+            if (VoiceChatManager.Instance != null)
+            {
+                VoiceChatManager.Instance.JoinChannel(roomId);
+                Debug.Log($"[GameController] Joining voice channel for room: {roomId}");
+            }
+        }
+
         private void CreateInGameVoiceChatUI()
         {
-            // Voice chat is disabled - don't create UI
-            if (VoiceChatManager.VOICE_CHAT_DISABLED)
-            {
-                return;
-            }
-
             if (Lekha.UI.InGameVoiceChatUI.Instance == null)
             {
                 GameObject voiceUIObj = new GameObject("InGameVoiceChatUI");
@@ -218,33 +221,6 @@ namespace Lekha.GameLogic
             }
 
             Lekha.UI.InGameVoiceChatUI.Instance?.Show();
-        }
-
-        /// <summary>
-        /// Enable voice chat by default for online games
-        /// </summary>
-        private void EnableVoiceChatByDefault()
-        {
-            // Voice chat is disabled - skip
-            if (VoiceChatManager.VOICE_CHAT_DISABLED)
-            {
-                return;
-            }
-
-            if (VoiceChatManager.Instance != null)
-            {
-                // Initialize voice chat
-                VoiceChatManager.Instance.Initialize();
-
-                // Ensure microphone is NOT muted by default
-                VoiceChatManager.Instance.SetMicrophoneMuted(false);
-                VoiceChatManager.Instance.SetSpeakerMuted(false);
-
-                // Start recording
-                VoiceChatManager.Instance.StartRecording();
-
-                Debug.Log("[GameController] Voice chat enabled by default");
-            }
         }
 
         /// <summary>
@@ -395,16 +371,15 @@ namespace Lekha.GameLogic
                 GameOverScreen.Instance.Hide();
             }
 
-            // Hide voice chat UI
+            // Hide voice chat UI and leave channel
             if (InGameVoiceChatUI.Instance != null)
             {
                 InGameVoiceChatUI.Instance.Hide();
             }
 
-            // Stop voice chat
             if (VoiceChatManager.Instance != null)
             {
-                VoiceChatManager.Instance.StopRecording();
+                VoiceChatManager.Instance.LeaveChannel();
             }
 
             // Disconnect from online room if connected

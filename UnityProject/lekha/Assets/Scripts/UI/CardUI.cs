@@ -38,8 +38,8 @@ namespace Lekha.UI
         private Coroutine scaleCoroutine;
         private Coroutine glowCoroutine;
 
-        // Visual settings
-        private static readonly Color PlayableGlow = new Color(1f, 0.9f, 0.4f, 0.6f);
+        // Visual settings - no glow for playable cards (cleaner look)
+        private static readonly Color PlayableGlow = Color.clear;
         private static readonly Color SelectedGlow = new Color(0.4f, 1f, 0.5f, 0.8f);
         private static readonly Color HoverGlow = new Color(1f, 1f, 1f, 0.5f);
 
@@ -156,14 +156,14 @@ namespace Lekha.UI
                 cardImage.color = Color.white;
                 cardShadow.effectDistance = new Vector2(4, -4);
 
-                // Show subtle playable indicator glow
+                // No glow for playable cards - cleaner look
                 if (glowImage != null)
                 {
-                    SetGlow(PlayableGlow, 0.3f);
+                    SetGlow(Color.clear, 0.3f);
                 }
                 if (cardOutline != null)
                 {
-                    cardOutline.effectColor = new Color(PlayableGlow.r, PlayableGlow.g, PlayableGlow.b, 0.4f);
+                    cardOutline.effectColor = Color.clear;
                 }
             }
             else
@@ -372,22 +372,11 @@ namespace Lekha.UI
                 cardShadow.effectDistance = new Vector2(4, -4);
                 cardShadow.effectColor = new Color(0, 0, 0, 0.5f);
 
-                // Restore playable glow or clear
-                if (isPlayable)
+                // Clear glow on exit - no persistent glow for cleaner look
+                SetGlow(Color.clear, 0.2f);
+                if (cardOutline != null)
                 {
-                    SetGlow(PlayableGlow, 0.2f);
-                    if (cardOutline != null)
-                    {
-                        cardOutline.effectColor = new Color(PlayableGlow.r, PlayableGlow.g, PlayableGlow.b, 0.4f);
-                    }
-                }
-                else
-                {
-                    SetGlow(Color.clear, 0.2f);
-                    if (cardOutline != null)
-                    {
-                        cardOutline.effectColor = Color.clear;
-                    }
+                    cardOutline.effectColor = Color.clear;
                 }
             }
         }

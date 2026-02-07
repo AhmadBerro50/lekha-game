@@ -1,69 +1,50 @@
 using UnityEngine;
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using Agora.Rtc;
 
 namespace Lekha.Network
 {
     /// <summary>
-    /// Voice chat settings
-    /// </summary>
-    [Serializable]
-    public class VoiceChatSettings
-    {
-        // Optimized for low bandwidth (was 16000Hz, 100ms = 32KB/s per player)
-        // Now 8000Hz, 250ms = ~4KB/s per player (8x reduction)
-        public int SampleRate = 8000;
-        public int RecordingFrequency = 8000;
-        public int ChunkDurationMs = 250;
-        public float VoiceActivationThreshold = 0.02f; // Higher threshold to filter more silence
-        public bool PushToTalk = false;
-    }
-
-    /// <summary>
-    /// Manages voice chat for online multiplayer
-    /// Handles microphone input, audio streaming, and playback
+    /// Manages voice chat using Agora RTC SDK.
+    /// Handles joining/leaving voice channels, mute controls, and speaking detection.
     /// </summary>
     public class VoiceChatManager : MonoBehaviour
     {
         public static VoiceChatManager Instance { get; private set; }
 
-        // Feature flag - set to true to completely disable voice chat
-        // TODO: Enable when we have a better server infrastructure
-        public static bool VOICE_CHAT_DISABLED = true;
+        private const string AGORA_APP_ID = "20f6a6b31dce4650a3b7ec2f2f6a8670";
 
-        // Settings
-        public VoiceChatSettings Settings { get; private set; } = new VoiceChatSettings();
+        // Agora engine
+        private IRtcEngine rtcEngine;
+        private bool isInitialized = false;
+        private bool isInChannel = false;
+        private string currentChannelName;
 
         // State
-        private bool isInitialized = false;
         private bool isMicrophoneMuted = false;
         private bool isSpeakerMuted = false;
-        private bool isRecording = false;
-        private bool isVoiceChatEnabled = true; // Master toggle
-        private string selectedMicrophone;
 
-        // Public property for voice chat enabled state
-        public bool IsVoiceChatEnabled => isVoiceChatEnabled;
+        // Speaking detection (uid -> volume 0-255)
+        private Dictionary<uint, int> speakingVolumes = new Dictionary<uint, int>();
+        private int localSpeakingVolume = 0;
 
-        // Audio components
-        private AudioClip microphoneClip;
-        private int lastSamplePosition = 0;
-        private float[] sampleBuffer;
-
-        // Playback for remote players
-        private Dictionary<string, AudioSource> playerAudioSources = new Dictionary<string, AudioSource>();
-        private Dictionary<string, Queue<float[]>> playerAudioQueues = new Dictionary<string, Queue<float[]>>();
+        // Map Agora uid to player ID for speaking indicators
+        private Dictionary<uint, string> uidToPlayerId = new Dictionary<uint, string>();
 
         // Events
         public event Action<bool> OnMicrophoneMuteChanged;
         public event Action<bool> OnSpeakerMuteChanged;
-        public event Action<string, bool> OnPlayerSpeaking;
+        public event Action<uint, bool> OnPlayerSpeaking; // uid, isSpeaking
         public event Action<string> OnVoiceChatError;
+        public event Action OnJoinedChannel;
+        public event Action OnLeftChannel;
 
-        // Voice activity detection
-        private Dictionary<string, float> playerSpeakingLevels = new Dictionary<string, float>();
-        private float localSpeakingLevel = 0f;
+        // Public properties
+        public bool IsMicrophoneMuted => isMicrophoneMuted;
+        public bool IsSpeakerMuted => isSpeakerMuted;
+        public bool IsInChannel => isInChannel;
+        public int LocalSpeakingVolume => localSpeakingVolume;
 
         private void Awake()
         {
@@ -76,140 +57,112 @@ namespace Lekha.Network
             DontDestroyOnLoad(gameObject);
         }
 
-        private void Start()
-        {
-            // Don't subscribe to anything if voice chat is disabled
-            if (VOICE_CHAT_DISABLED)
-            {
-                return;
-            }
-
-            // Subscribe to network voice data
-            if (NetworkManager.Instance != null)
-            {
-                NetworkManager.Instance.OnMessageReceived += OnNetworkMessageReceived;
-            }
-        }
-
         private void OnDestroy()
         {
-            StopRecording();
+            LeaveChannel();
+            DisposeEngine();
 
-            if (NetworkManager.Instance != null)
-            {
-                NetworkManager.Instance.OnMessageReceived -= OnNetworkMessageReceived;
-            }
-
-            // Clean up audio sources
-            foreach (var source in playerAudioSources.Values)
-            {
-                if (source != null)
-                {
-                    Destroy(source.gameObject);
-                }
-            }
-            playerAudioSources.Clear();
+            if (Instance == this)
+                Instance = null;
         }
 
         /// <summary>
-        /// Initialize voice chat system
+        /// Initialize the Agora RTC engine
         /// </summary>
         public bool Initialize()
         {
-            // Voice chat is disabled - don't initialize
-            if (VOICE_CHAT_DISABLED)
-            {
-                Debug.Log("[VoiceChatManager] Voice chat is disabled");
-                return false;
-            }
+            if (isInitialized) return true;
 
-            if (isInitialized)
+            try
             {
+                rtcEngine = Agora.Rtc.RtcEngine.CreateAgoraRtcEngine();
+
+                RtcEngineContext context = new RtcEngineContext();
+                context.appId = AGORA_APP_ID;
+                context.channelProfile = CHANNEL_PROFILE_TYPE.CHANNEL_PROFILE_COMMUNICATION;
+                context.audioScenario = AUDIO_SCENARIO_TYPE.AUDIO_SCENARIO_CHATROOM;
+
+                int result = rtcEngine.Initialize(context);
+                if (result != 0)
+                {
+                    Debug.LogError($"[VoiceChatManager] Agora Initialize failed: {result}");
+                    OnVoiceChatError?.Invoke($"Agora init failed: {result}");
+                    return false;
+                }
+
+                // Set up event handler
+                rtcEngine.InitEventHandler(new VoiceChatEventHandler(this));
+
+                // Enable audio
+                rtcEngine.EnableAudio();
+                rtcEngine.SetClientRole(CLIENT_ROLE_TYPE.CLIENT_ROLE_BROADCASTER);
+
+                // Enable volume indication for speaking detection (every 200ms)
+                rtcEngine.EnableAudioVolumeIndication(200, 3, true);
+
+                // Optimize for voice chat
+                rtcEngine.SetAudioProfile(AUDIO_PROFILE_TYPE.AUDIO_PROFILE_SPEECH_STANDARD);
+
+                isInitialized = true;
+                Debug.Log("[VoiceChatManager] Agora initialized successfully");
                 return true;
             }
-
-            // Check microphone availability
-            if (Microphone.devices.Length == 0)
+            catch (Exception e)
             {
-                Debug.LogWarning("[VoiceChatManager] No microphone devices found");
-                OnVoiceChatError?.Invoke("No microphone found");
+                Debug.LogError($"[VoiceChatManager] Agora initialization error: {e.Message}");
+                OnVoiceChatError?.Invoke($"Init error: {e.Message}");
                 return false;
             }
-
-            // Select first available microphone
-            selectedMicrophone = Microphone.devices[0];
-            Debug.Log($"[VoiceChatManager] Selected microphone: {selectedMicrophone}");
-
-            // Calculate buffer size
-            int samplesPerChunk = (Settings.SampleRate * Settings.ChunkDurationMs) / 1000;
-            sampleBuffer = new float[samplesPerChunk];
-
-            isInitialized = true;
-            Debug.Log("[VoiceChatManager] Initialized successfully");
-
-            return true;
         }
 
         /// <summary>
-        /// Start recording from microphone
+        /// Join the voice channel for the current game room.
+        /// Uses the room ID as the channel name so all players in the same room hear each other.
         /// </summary>
-        public void StartRecording()
+        public void JoinChannel(string roomId)
         {
             if (!isInitialized)
             {
-                if (!Initialize())
-                {
-                    return;
-                }
+                if (!Initialize()) return;
             }
 
-            if (isRecording)
+            if (isInChannel)
             {
-                return;
+                if (currentChannelName == roomId) return;
+                LeaveChannel();
             }
 
-            // Start microphone recording (loop mode, 1 second buffer)
-            microphoneClip = Microphone.Start(selectedMicrophone, true, 1, Settings.RecordingFrequency);
+            currentChannelName = roomId;
 
-            if (microphoneClip == null)
+            // Join with uid=0 (auto-assign)
+            int result = rtcEngine.JoinChannel("", roomId, "", 0);
+            if (result != 0)
             {
-                Debug.LogError("[VoiceChatManager] Failed to start microphone");
-                OnVoiceChatError?.Invoke("Failed to start microphone");
-                return;
+                Debug.LogError($"[VoiceChatManager] JoinChannel failed: {result}");
+                OnVoiceChatError?.Invoke($"Join failed: {result}");
             }
-
-            // Wait for microphone to start
-            while (Microphone.GetPosition(selectedMicrophone) <= 0) { }
-
-            lastSamplePosition = 0;
-            isRecording = true;
-
-            // Start processing coroutine
-            StartCoroutine(ProcessMicrophoneInput());
-
-            Debug.Log("[VoiceChatManager] Started recording");
+            else
+            {
+                Debug.Log($"[VoiceChatManager] Joining channel: {roomId}");
+            }
         }
 
         /// <summary>
-        /// Stop recording
+        /// Leave the current voice channel
         /// </summary>
-        public void StopRecording()
+        public void LeaveChannel()
         {
-            if (!isRecording)
-            {
-                return;
-            }
+            if (!isInChannel || rtcEngine == null) return;
 
-            isRecording = false;
-            StopCoroutine(ProcessMicrophoneInput());
+            rtcEngine.LeaveChannel();
+            isInChannel = false;
+            currentChannelName = null;
+            speakingVolumes.Clear();
+            uidToPlayerId.Clear();
+            localSpeakingVolume = 0;
 
-            if (Microphone.IsRecording(selectedMicrophone))
-            {
-                Microphone.End(selectedMicrophone);
-            }
-
-            microphoneClip = null;
-            Debug.Log("[VoiceChatManager] Stopped recording");
+            Debug.Log("[VoiceChatManager] Left voice channel");
+            OnLeftChannel?.Invoke();
         }
 
         /// <summary>
@@ -218,333 +171,28 @@ namespace Lekha.Network
         public void SetMicrophoneMuted(bool muted)
         {
             isMicrophoneMuted = muted;
+            rtcEngine?.MuteLocalAudioStream(muted);
             OnMicrophoneMuteChanged?.Invoke(muted);
             Debug.Log($"[VoiceChatManager] Microphone muted: {muted}");
         }
 
         /// <summary>
-        /// Toggle speaker mute
+        /// Toggle speaker mute (mute all remote audio)
         /// </summary>
         public void SetSpeakerMuted(bool muted)
         {
             isSpeakerMuted = muted;
-
-            // Mute/unmute all player audio sources
-            foreach (var source in playerAudioSources.Values)
-            {
-                if (source != null)
-                {
-                    source.mute = muted;
-                }
-            }
-
+            rtcEngine?.MuteAllRemoteAudioStreams(muted);
             OnSpeakerMuteChanged?.Invoke(muted);
             Debug.Log($"[VoiceChatManager] Speaker muted: {muted}");
         }
 
         /// <summary>
-        /// Check if microphone is muted
+        /// Get speaking volume for a remote user (0-255)
         /// </summary>
-        public bool IsMicrophoneMuted => isMicrophoneMuted;
-
-        /// <summary>
-        /// Check if speaker is muted
-        /// </summary>
-        public bool IsSpeakerMuted => isSpeakerMuted;
-
-        /// <summary>
-        /// Get local speaking level (0-1)
-        /// </summary>
-        public float LocalSpeakingLevel => localSpeakingLevel;
-
-        /// <summary>
-        /// Get speaking level for a remote player
-        /// </summary>
-        public float GetPlayerSpeakingLevel(string playerId)
+        public int GetSpeakingVolume(uint uid)
         {
-            return playerSpeakingLevels.TryGetValue(playerId, out float level) ? level : 0f;
-        }
-
-        /// <summary>
-        /// Mute a specific player
-        /// </summary>
-        public void MutePlayer(string playerId, bool muted)
-        {
-            if (playerAudioSources.TryGetValue(playerId, out AudioSource source))
-            {
-                source.mute = muted;
-            }
-
-            // Notify network
-            if (NetworkManager.Instance != null)
-            {
-                var msgType = muted ? NetworkMessageType.MutePlayer : NetworkMessageType.UnmutePlayer;
-                NetworkManager.Instance.SendGameAction(msgType, playerId);
-            }
-
-            Debug.Log($"[VoiceChatManager] Player {playerId} muted: {muted}");
-        }
-
-        private IEnumerator ProcessMicrophoneInput()
-        {
-            while (isRecording)
-            {
-                int currentPosition = Microphone.GetPosition(selectedMicrophone);
-
-                if (currentPosition < 0 || microphoneClip == null)
-                {
-                    yield return null;
-                    continue;
-                }
-
-                // Calculate how many samples we have
-                int samplesAvailable;
-                if (currentPosition < lastSamplePosition)
-                {
-                    // Wrapped around
-                    samplesAvailable = (microphoneClip.samples - lastSamplePosition) + currentPosition;
-                }
-                else
-                {
-                    samplesAvailable = currentPosition - lastSamplePosition;
-                }
-
-                // Process in chunks
-                while (samplesAvailable >= sampleBuffer.Length)
-                {
-                    // Get samples
-                    microphoneClip.GetData(sampleBuffer, lastSamplePosition);
-
-                    // Calculate RMS level for voice activity detection
-                    float sum = 0f;
-                    for (int i = 0; i < sampleBuffer.Length; i++)
-                    {
-                        sum += sampleBuffer[i] * sampleBuffer[i];
-                    }
-                    float rms = Mathf.Sqrt(sum / sampleBuffer.Length);
-                    localSpeakingLevel = rms;
-
-                    // Only send if enabled, not muted, and above threshold
-                    if (isVoiceChatEnabled && !isMicrophoneMuted && rms > Settings.VoiceActivationThreshold)
-                    {
-                        SendVoiceData(sampleBuffer);
-                    }
-
-                    // Update position
-                    lastSamplePosition = (lastSamplePosition + sampleBuffer.Length) % microphoneClip.samples;
-                    samplesAvailable -= sampleBuffer.Length;
-                }
-
-                // Wait for next chunk
-                yield return new WaitForSeconds(Settings.ChunkDurationMs / 1000f);
-            }
-        }
-
-        private void SendVoiceData(float[] samples)
-        {
-            // Convert float samples to bytes (16-bit PCM)
-            byte[] audioData = new byte[samples.Length * 2];
-
-            for (int i = 0; i < samples.Length; i++)
-            {
-                short pcmValue = (short)(Mathf.Clamp(samples[i], -1f, 1f) * 32767);
-                byte[] bytes = BitConverter.GetBytes(pcmValue);
-                audioData[i * 2] = bytes[0];
-                audioData[i * 2 + 1] = bytes[1];
-            }
-
-            // Send via network
-            NetworkManager.Instance?.SendVoiceData(audioData);
-        }
-
-        private void OnNetworkMessageReceived(NetworkMessage message)
-        {
-            // Ignore voice data if voice chat is disabled
-            if (!isVoiceChatEnabled) return;
-
-            if (message.GetMessageType() == NetworkMessageType.VoiceData)
-            {
-                ProcessReceivedVoiceData(message.SenderId, message.Data);
-            }
-        }
-
-        /// <summary>
-        /// Enable or disable voice chat completely
-        /// </summary>
-        public void SetVoiceChatEnabled(bool enabled)
-        {
-            isVoiceChatEnabled = enabled;
-            Debug.Log($"[VoiceChatManager] Voice chat {(enabled ? "enabled" : "disabled")}");
-
-            if (!enabled)
-            {
-                // Stop all playback when disabling
-                foreach (var source in playerAudioSources.Values)
-                {
-                    if (source != null && source.isPlaying)
-                    {
-                        source.Stop();
-                    }
-                }
-                // Clear queues
-                foreach (var queue in playerAudioQueues.Values)
-                {
-                    queue.Clear();
-                }
-            }
-        }
-
-        /// <summary>
-        /// Toggle voice chat on/off
-        /// </summary>
-        public void ToggleVoiceChat()
-        {
-            SetVoiceChatEnabled(!isVoiceChatEnabled);
-        }
-
-        private void ProcessReceivedVoiceData(string senderId, string base64Data)
-        {
-            // Don't play our own voice
-            if (senderId == NetworkManager.Instance?.LocalPlayerId)
-            {
-                return;
-            }
-
-            if (isSpeakerMuted)
-            {
-                return;
-            }
-
-            try
-            {
-                // Decode base64 to bytes
-                byte[] audioData = Convert.FromBase64String(base64Data);
-
-                // Convert bytes back to float samples
-                float[] samples = new float[audioData.Length / 2];
-                for (int i = 0; i < samples.Length; i++)
-                {
-                    short pcmValue = BitConverter.ToInt16(audioData, i * 2);
-                    samples[i] = pcmValue / 32767f;
-                }
-
-                // Calculate speaking level
-                float sum = 0f;
-                for (int i = 0; i < samples.Length; i++)
-                {
-                    sum += samples[i] * samples[i];
-                }
-                float rms = Mathf.Sqrt(sum / samples.Length);
-                playerSpeakingLevels[senderId] = rms;
-
-                // Notify that player is speaking
-                OnPlayerSpeaking?.Invoke(senderId, rms > Settings.VoiceActivationThreshold);
-
-                // Queue for playback
-                QueueAudioForPlayback(senderId, samples);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[VoiceChatManager] Error processing voice data: {e.Message}");
-            }
-        }
-
-        private void QueueAudioForPlayback(string playerId, float[] samples)
-        {
-            // Get or create audio source for this player
-            if (!playerAudioSources.TryGetValue(playerId, out AudioSource source))
-            {
-                source = CreatePlayerAudioSource(playerId);
-                playerAudioSources[playerId] = source;
-            }
-
-            // Get or create queue
-            if (!playerAudioQueues.TryGetValue(playerId, out Queue<float[]> queue))
-            {
-                queue = new Queue<float[]>();
-                playerAudioQueues[playerId] = queue;
-            }
-
-            // Add samples to queue
-            queue.Enqueue(samples);
-
-            // Start playback if not already playing
-            if (!source.isPlaying && queue.Count > 2) // Buffer a few chunks before starting
-            {
-                StartCoroutine(PlaybackAudioQueue(playerId));
-            }
-        }
-
-        private AudioSource CreatePlayerAudioSource(string playerId)
-        {
-            GameObject audioObj = new GameObject($"VoiceAudio_{playerId}");
-            audioObj.transform.SetParent(transform);
-
-            AudioSource source = audioObj.AddComponent<AudioSource>();
-            source.spatialBlend = 0f; // 2D audio
-            source.volume = 1f;
-            source.mute = isSpeakerMuted;
-            source.playOnAwake = false;
-
-            return source;
-        }
-
-        private IEnumerator PlaybackAudioQueue(string playerId)
-        {
-            if (!playerAudioSources.TryGetValue(playerId, out AudioSource source))
-            {
-                yield break;
-            }
-
-            if (!playerAudioQueues.TryGetValue(playerId, out Queue<float[]> queue))
-            {
-                yield break;
-            }
-
-            while (queue.Count > 0)
-            {
-                float[] samples = queue.Dequeue();
-
-                // Create audio clip from samples
-                AudioClip clip = AudioClip.Create($"Voice_{playerId}", samples.Length, 1, Settings.SampleRate, false);
-                clip.SetData(samples, 0);
-
-                // Play
-                source.clip = clip;
-                source.Play();
-
-                // Wait for playback
-                yield return new WaitForSeconds((float)samples.Length / Settings.SampleRate);
-
-                // Clean up
-                Destroy(clip);
-            }
-
-            // Clear speaking level after playback ends
-            playerSpeakingLevels[playerId] = 0f;
-            OnPlayerSpeaking?.Invoke(playerId, false);
-        }
-
-        /// <summary>
-        /// Get available microphone devices
-        /// </summary>
-        public string[] GetAvailableMicrophones()
-        {
-            return Microphone.devices;
-        }
-
-        /// <summary>
-        /// Select a specific microphone
-        /// </summary>
-        public void SelectMicrophone(string deviceName)
-        {
-            if (isRecording)
-            {
-                StopRecording();
-            }
-
-            selectedMicrophone = deviceName;
-            Debug.Log($"[VoiceChatManager] Selected microphone: {deviceName}");
+            return speakingVolumes.TryGetValue(uid, out int vol) ? vol : 0;
         }
 
         /// <summary>
@@ -552,22 +200,107 @@ namespace Lekha.Network
         /// </summary>
         public void Reset()
         {
-            StopRecording();
-
-            foreach (var source in playerAudioSources.Values)
-            {
-                if (source != null)
-                {
-                    Destroy(source.gameObject);
-                }
-            }
-            playerAudioSources.Clear();
-            playerAudioQueues.Clear();
-            playerSpeakingLevels.Clear();
-
+            LeaveChannel();
             isMicrophoneMuted = false;
             isSpeakerMuted = false;
-            localSpeakingLevel = 0f;
+        }
+
+        private void DisposeEngine()
+        {
+            if (rtcEngine != null)
+            {
+                rtcEngine.InitEventHandler(null);
+                rtcEngine.Dispose();
+                rtcEngine = null;
+                isInitialized = false;
+            }
+        }
+
+        // Called by event handler
+        internal void HandleJoinChannelSuccess(uint uid)
+        {
+            isInChannel = true;
+            Debug.Log($"[VoiceChatManager] Joined channel successfully, uid: {uid}");
+            OnJoinedChannel?.Invoke();
+        }
+
+        internal void HandleUserJoined(uint uid)
+        {
+            Debug.Log($"[VoiceChatManager] Remote user joined: {uid}");
+        }
+
+        internal void HandleUserOffline(uint uid)
+        {
+            speakingVolumes.Remove(uid);
+            uidToPlayerId.Remove(uid);
+            OnPlayerSpeaking?.Invoke(uid, false);
+            Debug.Log($"[VoiceChatManager] Remote user left: {uid}");
+        }
+
+        internal void HandleAudioVolumeIndication(AudioVolumeInfo[] speakers, int totalVolume)
+        {
+            foreach (var speaker in speakers)
+            {
+                if (speaker.uid == 0)
+                {
+                    // Local user
+                    localSpeakingVolume = (int)speaker.volume;
+                }
+                else
+                {
+                    speakingVolumes[speaker.uid] = (int)speaker.volume;
+                    OnPlayerSpeaking?.Invoke(speaker.uid, speaker.volume > 10);
+                }
+            }
+        }
+
+        internal void HandleError(int err, string msg)
+        {
+            Debug.LogError($"[VoiceChatManager] Agora error {err}: {msg}");
+            OnVoiceChatError?.Invoke($"Error {err}: {msg}");
+        }
+    }
+
+    /// <summary>
+    /// Agora RTC event handler
+    /// </summary>
+    internal class VoiceChatEventHandler : IRtcEngineEventHandler
+    {
+        private readonly VoiceChatManager manager;
+
+        internal VoiceChatEventHandler(VoiceChatManager manager)
+        {
+            this.manager = manager;
+        }
+
+        public override void OnJoinChannelSuccess(RtcConnection connection, int elapsed)
+        {
+            manager.HandleJoinChannelSuccess(connection.localUid);
+        }
+
+        public override void OnUserJoined(RtcConnection connection, uint uid, int elapsed)
+        {
+            manager.HandleUserJoined(uid);
+        }
+
+        public override void OnUserOffline(RtcConnection connection, uint uid, USER_OFFLINE_REASON_TYPE reason)
+        {
+            manager.HandleUserOffline(uid);
+        }
+
+        public override void OnAudioVolumeIndication(RtcConnection connection, AudioVolumeInfo[] speakers, uint speakerNumber, int totalVolume)
+        {
+            manager.HandleAudioVolumeIndication(speakers, totalVolume);
+        }
+
+        public override void OnError(int err, string msg)
+        {
+            manager.HandleError(err, msg);
+        }
+
+        public override void OnLeaveChannel(RtcConnection connection, RtcStats stats)
+        {
+            Debug.Log("[VoiceChatManager] OnLeaveChannel callback");
         }
     }
 }

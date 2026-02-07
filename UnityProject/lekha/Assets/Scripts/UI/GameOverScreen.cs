@@ -10,7 +10,7 @@ using System.Collections.Generic;
 namespace Lekha.UI
 {
     /// <summary>
-    /// Enhanced game over screen with luxurious animations and statistics
+    /// Modern 2026 game over screen with glassmorphism and animations
     /// </summary>
     public class GameOverScreen : MonoBehaviour
     {
@@ -28,13 +28,22 @@ namespace Lekha.UI
         private List<GameObject> confettiParticles = new List<GameObject>();
         private Coroutine confettiCoroutine;
 
-        // Colors
-        private static readonly Color WinGold = new Color(1f, 0.85f, 0.3f, 1f);
-        private static readonly Color WinGoldDark = new Color(0.85f, 0.68f, 0.25f, 1f);
-        private static readonly Color LoseRed = new Color(0.8f, 0.25f, 0.2f, 1f);
-        private static readonly Color LoseRedDark = new Color(0.6f, 0.15f, 0.12f, 1f);
-        private static readonly Color DeepGreen = new Color(0.04f, 0.12f, 0.08f, 1f);
-        private static readonly Color CreamWhite = new Color(0.98f, 0.96f, 0.90f, 1f);
+        // Modern 2026 Colors
+        private static readonly Color WinCyan = new Color(0.40f, 0.85f, 1f, 1f);          // Bright cyan for win
+        private static readonly Color WinCyanDark = new Color(0.30f, 0.70f, 0.90f, 1f);   // Darker cyan
+        private static readonly Color LoseRed = new Color(0.95f, 0.35f, 0.40f, 1f);       // Modern red
+        private static readonly Color LoseRedDark = new Color(0.75f, 0.25f, 0.30f, 1f);   // Darker red
+        private static readonly Color BackgroundDark = new Color(0.06f, 0.08f, 0.14f, 1f);// Deep navy
+        private static readonly Color TextWhite = new Color(1f, 1f, 1f, 1f);               // Pure white
+        private static readonly Color TextMuted = new Color(0.75f, 0.80f, 0.90f, 1f);     // Soft blue-white
+        private static readonly Color AccentMagenta = new Color(0.85f, 0.45f, 0.95f, 1f); // Vibrant magenta
+        private static readonly Color GlassPanel = new Color(0.12f, 0.14f, 0.22f, 0.92f); // Glass color
+
+        // Legacy aliases
+        private static readonly Color WinGold = WinCyan;
+        private static readonly Color WinGoldDark = WinCyanDark;
+        private static readonly Color DeepGreen = BackgroundDark;
+        private static readonly Color CreamWhite = TextWhite;
 
         public System.Action OnPlayAgain;
         public System.Action OnMainMenu;
@@ -121,7 +130,7 @@ namespace Lekha.UI
             canvasGroup = canvasObj.AddComponent<CanvasGroup>();
             canvasGroup.alpha = 0;
 
-            // Dark overlay
+            // Modern dark overlay with subtle gradient
             GameObject overlayObj = new GameObject("Overlay");
             overlayObj.transform.SetParent(canvasObj.transform, false);
 
@@ -131,9 +140,9 @@ namespace Lekha.UI
             overlayRect.sizeDelta = Vector2.zero;
 
             Image overlayImg = overlayObj.AddComponent<Image>();
-            overlayImg.color = new Color(0, 0, 0, 0.92f);
+            overlayImg.color = new Color(0.02f, 0.03f, 0.06f, 0.92f);
 
-            // Main panel
+            // Modern glass panel
             screenPanel = new GameObject("GameOverPanel");
             screenPanel.transform.SetParent(canvasObj.transform, false);
 
@@ -143,7 +152,9 @@ namespace Lekha.UI
             panelRect.sizeDelta = new Vector2(700, 650);
 
             Image panelBg = screenPanel.AddComponent<Image>();
-            panelBg.color = new Color(DeepGreen.r, DeepGreen.g, DeepGreen.b, 0.98f);
+            panelBg.sprite = CreateGlassPanelSprite(256, 256, 24);
+            panelBg.type = Image.Type.Sliced;
+            panelBg.color = Color.white;
 
             // Create UI elements
             CreateResultSection(screenPanel.transform);
@@ -239,7 +250,7 @@ namespace Lekha.UI
             containerRect.sizeDelta = new Vector2(550, 150);
 
             Image containerBg = statsContainer.AddComponent<Image>();
-            containerBg.color = new Color(0, 0, 0, 0.3f);
+            containerBg.color = new Color(0.08f, 0.10f, 0.16f, 0.5f);
 
             // Stats will be populated dynamically
         }
@@ -335,44 +346,23 @@ namespace Lekha.UI
             rect.anchorMin = new Vector2(0.5f, 1f);
             rect.anchorMax = new Vector2(0.5f, 1f);
             rect.anchoredPosition = position;
-            rect.sizeDelta = isPrimary ? new Vector2(280, 60) : new Vector2(220, 50);
+            rect.sizeDelta = isPrimary ? new Vector2(280, 58) : new Vector2(220, 48);
 
             Image img = btnObj.AddComponent<Image>();
-            img.sprite = CreateRoundedRectSprite(128, 48, 12);
+            img.sprite = CreateModernButtonSprite(128, 48, 16, isPrimary);
             img.type = Image.Type.Sliced;
-            img.color = isPrimary ? WinGold : new Color(WinGold.r, WinGold.g, WinGold.b, 0.2f);
+            img.color = Color.white;
 
             Button btn = btnObj.AddComponent<Button>();
             btn.targetGraphic = img;
 
             ColorBlock colors = btn.colors;
-            if (isPrimary)
-            {
-                colors.normalColor = WinGold;
-                colors.highlightedColor = new Color(WinGold.r * 1.1f, WinGold.g * 1.1f, WinGold.b * 1.1f, 1f);
-                colors.pressedColor = WinGoldDark;
-            }
-            else
-            {
-                colors.normalColor = new Color(1, 1, 1, 0.2f);
-                colors.highlightedColor = new Color(1, 1, 1, 0.35f);
-                colors.pressedColor = new Color(1, 1, 1, 0.15f);
-            }
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.1f, 1.1f, 1.15f, 1f);
+            colors.pressedColor = new Color(0.9f, 0.9f, 0.95f, 1f);
             btn.colors = colors;
 
             btn.onClick.AddListener(onClick);
-
-            if (!isPrimary)
-            {
-                Outline outline = btnObj.AddComponent<Outline>();
-                outline.effectColor = new Color(WinGold.r, WinGold.g, WinGold.b, 0.5f);
-                outline.effectDistance = new Vector2(1.5f, -1.5f);
-            }
-
-            // Shadow
-            Shadow shadow = btnObj.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.4f);
-            shadow.effectDistance = new Vector2(2, -2);
 
             // Text
             GameObject textObj = new GameObject("Text");
@@ -385,12 +375,78 @@ namespace Lekha.UI
 
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = text;
-            tmp.fontSize = isPrimary ? 26 : 20;
+            tmp.fontSize = isPrimary ? 24 : 18;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = isPrimary ? new Color(0.15f, 0.08f, 0.04f, 1f) : CreamWhite;
+            tmp.color = isPrimary ? TextWhite : TextMuted;
 
             return btnObj;
+        }
+
+        private Sprite CreateModernButtonSprite(int width, int height, int radius, bool isPrimary)
+        {
+            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            Color fillStart, fillEnd, borderColor;
+            if (isPrimary)
+            {
+                // Vibrant blue gradient
+                fillStart = new Color(0.25f, 0.45f, 0.85f, 1f);
+                fillEnd = new Color(0.35f, 0.55f, 0.95f, 1f);
+                borderColor = new Color(0.5f, 0.75f, 1f, 0.5f);
+            }
+            else
+            {
+                // Glass style
+                fillStart = new Color(0.15f, 0.18f, 0.25f, 0.8f);
+                fillEnd = new Color(0.20f, 0.23f, 0.32f, 0.8f);
+                borderColor = new Color(1f, 1f, 1f, 0.2f);
+            }
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float dist = DistanceToRoundedRect(x, y, width, height, radius);
+
+                    if (dist <= 0)
+                    {
+                        float gradT = (float)y / height;
+                        Color baseColor = Color.Lerp(fillStart, fillEnd, gradT);
+
+                        // Gloss at top
+                        if (gradT > 0.7f)
+                        {
+                            float glossT = (gradT - 0.7f) / 0.3f;
+                            baseColor = Color.Lerp(baseColor, baseColor + new Color(0.1f, 0.1f, 0.15f, 0f), glossT * glossT);
+                        }
+
+                        // Border glow
+                        if (dist > -2.5f)
+                        {
+                            float borderT = (dist + 2.5f) / 2.5f;
+                            baseColor = Color.Lerp(baseColor, borderColor, borderT * 0.4f);
+                        }
+
+                        tex.SetPixel(x, y, baseColor);
+                    }
+                    else if (dist < 2f)
+                    {
+                        float alpha = 1f - dist / 2f;
+                        Color c = borderColor;
+                        c.a *= alpha * 0.5f;
+                        tex.SetPixel(x, y, c);
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                }
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius + 2, radius + 2, radius + 2, radius + 2));
         }
 
         private void UpdateContent(bool playerWon, int yourScore, int opponentScore, int roundsPlayed)
@@ -602,7 +658,8 @@ namespace Lekha.UI
             rect.localRotation = Quaternion.Euler(0, 0, Random.Range(0f, 360f));
 
             Image img = particle.AddComponent<Image>();
-            Color[] colors = { WinGold, new Color(1f, 0.5f, 0.2f), new Color(0.3f, 0.8f, 0.5f), CreamWhite };
+            // Modern confetti colors: cyan, magenta, mint, white
+            Color[] colors = { WinCyan, AccentMagenta, new Color(0.45f, 0.95f, 0.75f), TextWhite };
             img.color = colors[Random.Range(0, colors.Length)];
 
             StartCoroutine(AnimateConfetti(rect, img));
@@ -660,6 +717,73 @@ namespace Lekha.UI
 
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        private Sprite CreateGlassPanelSprite(int width, int height, int radius)
+        {
+            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            Color fillColor = GlassPanel;
+            Color borderColor = new Color(1f, 1f, 1f, 0.15f);
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float dist = DistanceToRoundedRect(x, y, width, height, radius);
+
+                    if (dist <= 0)
+                    {
+                        float gradT = (float)y / height;
+                        Color col = Color.Lerp(fillColor * 0.85f, fillColor * 1.1f, gradT);
+
+                        // Border highlight
+                        if (dist > -2f)
+                        {
+                            float borderT = (dist + 2f) / 2f;
+                            col = Color.Lerp(col, borderColor, borderT * 0.6f);
+                        }
+
+                        tex.SetPixel(x, y, col);
+                    }
+                    else if (dist < 2f)
+                    {
+                        float alpha = 1f - dist / 2f;
+                        Color c = borderColor;
+                        c.a *= alpha;
+                        tex.SetPixel(x, y, c);
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                }
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(radius + 2, radius + 2, radius + 2, radius + 2));
+        }
+
+        private float DistanceToRoundedRect(int x, int y, int width, int height, int radius)
+        {
+            float px = Mathf.Clamp(x, radius, width - radius - 1);
+            float py = Mathf.Clamp(y, radius, height - radius - 1);
+
+            bool inCorner = (x < radius || x >= width - radius) && (y < radius || y >= height - radius);
+
+            if (inCorner)
+            {
+                float cx = x < radius ? radius : width - radius - 1;
+                float cy = y < radius ? radius : height - radius - 1;
+                return Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy)) - radius;
+            }
+            else
+            {
+                float dx = x < radius ? radius - x : (x >= width - radius ? x - (width - radius - 1) : 0);
+                float dy = y < radius ? radius - y : (y >= height - radius ? y - (height - radius - 1) : 0);
+                return Mathf.Max(dx, dy) - radius;
+            }
         }
 
         private Sprite CreateTrophySprite()

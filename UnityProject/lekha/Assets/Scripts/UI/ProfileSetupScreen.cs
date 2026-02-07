@@ -27,12 +27,13 @@ namespace Lekha.UI
         public System.Action OnProfileSaved;
         public System.Action OnScreenClosed;
 
-        // Luxurious Casino Colors (matching PremiumMainMenu)
-        private static readonly Color DeepGreen = new Color(0.04f, 0.12f, 0.08f, 1f);
-        private static readonly Color LuxuryGold = new Color(0.85f, 0.68f, 0.30f, 1f);
-        private static readonly Color BrightGold = new Color(1f, 0.85f, 0.45f, 1f);
-        private static readonly Color CreamWhite = new Color(0.98f, 0.96f, 0.90f, 1f);
-        private static readonly Color DarkWood = new Color(0.15f, 0.08f, 0.04f, 1f);
+        // Modern 2026 Glassmorphism Colors
+        private static readonly Color DeepNavy = new Color(0.06f, 0.08f, 0.14f, 1f);
+        private static readonly Color GlassPanel = new Color(0.12f, 0.14f, 0.22f, 0.95f);
+        private static readonly Color AccentCyan = new Color(0.40f, 0.75f, 1f, 1f);
+        private static readonly Color AccentMagenta = new Color(0.85f, 0.45f, 0.95f, 1f);
+        private static readonly Color TextWhite = new Color(1f, 1f, 1f, 1f);
+        private static readonly Color DarkBg = new Color(0.08f, 0.10f, 0.16f, 1f);
 
         private void Awake()
         {
@@ -97,7 +98,7 @@ namespace Lekha.UI
             overlayRect.sizeDelta = Vector2.zero;
 
             Image overlayImg = overlayObj.AddComponent<Image>();
-            overlayImg.color = new Color(0, 0, 0, 0.9f);
+            overlayImg.color = new Color(0.04f, 0.05f, 0.10f, 0.88f);
 
             // Main panel
             screenPanel = new GameObject("ProfilePanel");
@@ -110,17 +111,17 @@ namespace Lekha.UI
             panelRect.sizeDelta = new Vector2(600, 700);
 
             Image panelBg = screenPanel.AddComponent<Image>();
-            panelBg.color = new Color(DeepGreen.r, DeepGreen.g, DeepGreen.b, 0.98f);
+            panelBg.color = GlassPanel;
 
-            // Gold border
+            // Cyan glow border
             Outline border = screenPanel.AddComponent<Outline>();
-            border.effectColor = new Color(LuxuryGold.r, LuxuryGold.g, LuxuryGold.b, 0.8f);
-            border.effectDistance = new Vector2(3, -3);
+            border.effectColor = new Color(AccentCyan.r, AccentCyan.g, AccentCyan.b, 0.25f);
+            border.effectDistance = new Vector2(2, -2);
 
             // Shadow
             Shadow shadow = screenPanel.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.7f);
-            shadow.effectDistance = new Vector2(6, -6);
+            shadow.effectColor = new Color(0, 0, 0, 0.5f);
+            shadow.effectDistance = new Vector2(0, -6);
 
             CreateTitle(screenPanel.transform);
             CreateAvatarSection(screenPanel.transform);
@@ -145,7 +146,7 @@ namespace Lekha.UI
             tmp.fontSize = 42;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontStyle = FontStyles.Bold;
-            tmp.color = LuxuryGold;
+            tmp.color = AccentCyan;
         }
 
         private void CreateAvatarSection(Transform parent)
@@ -165,7 +166,7 @@ namespace Lekha.UI
             // Gold ring around avatar
             Image ringImg = avatarContainer.AddComponent<Image>();
             ringImg.sprite = CreateCircleSprite(128);
-            ringImg.color = LuxuryGold;
+            ringImg.color = AccentCyan;
 
             // Avatar background (for placeholder)
             GameObject avatarBgObj = new GameObject("AvatarBg");
@@ -209,7 +210,7 @@ namespace Lekha.UI
 
             Image changeBtnImg = changeBtnObj.AddComponent<Image>();
             changeBtnImg.sprite = CreateCircleSprite(64);
-            changeBtnImg.color = LuxuryGold;
+            changeBtnImg.color = AccentCyan;
 
             Button changeBtn = changeBtnObj.AddComponent<Button>();
             changeBtn.targetGraphic = changeBtnImg;
@@ -228,7 +229,7 @@ namespace Lekha.UI
             iconTmp.text = "+";
             iconTmp.fontSize = 32;
             iconTmp.fontStyle = FontStyles.Bold;
-            iconTmp.color = DarkWood;
+            iconTmp.color = DarkBg;
             iconTmp.alignment = TextAlignmentOptions.Center;
 
             // Tap to change hint
@@ -244,7 +245,7 @@ namespace Lekha.UI
             TextMeshProUGUI hintTmp = hintObj.AddComponent<TextMeshProUGUI>();
             hintTmp.text = "Tap + to change photo";
             hintTmp.fontSize = 16;
-            hintTmp.color = new Color(CreamWhite.r, CreamWhite.g, CreamWhite.b, 0.6f);
+            hintTmp.color = new Color(TextWhite.r, TextWhite.g, TextWhite.b, 0.6f);
             hintTmp.alignment = TextAlignmentOptions.Center;
             hintTmp.fontStyle = FontStyles.Italic;
         }
@@ -264,7 +265,7 @@ namespace Lekha.UI
             TextMeshProUGUI labelTmp = labelObj.AddComponent<TextMeshProUGUI>();
             labelTmp.text = "DISPLAY NAME";
             labelTmp.fontSize = 18;
-            labelTmp.color = LuxuryGold;
+            labelTmp.color = AccentCyan;
             labelTmp.alignment = TextAlignmentOptions.Center;
             labelTmp.fontStyle = FontStyles.Bold;
 
@@ -279,10 +280,10 @@ namespace Lekha.UI
             containerRect.sizeDelta = new Vector2(400, 60);
 
             Image containerImg = inputContainer.AddComponent<Image>();
-            containerImg.color = new Color(0.02f, 0.06f, 0.04f, 1f);
+            containerImg.color = new Color(0.08f, 0.10f, 0.16f, 0.95f);
 
             Outline inputBorder = inputContainer.AddComponent<Outline>();
-            inputBorder.effectColor = new Color(LuxuryGold.r, LuxuryGold.g, LuxuryGold.b, 0.5f);
+            inputBorder.effectColor = new Color(AccentCyan.r, AccentCyan.g, AccentCyan.b, 0.5f);
             inputBorder.effectDistance = new Vector2(1.5f, -1.5f);
 
             // Text area
@@ -306,7 +307,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI textTmp = textObj.AddComponent<TextMeshProUGUI>();
             textTmp.fontSize = 28;
-            textTmp.color = CreamWhite;
+            textTmp.color = TextWhite;
             textTmp.alignment = TextAlignmentOptions.Left;
 
             // Placeholder
@@ -321,7 +322,7 @@ namespace Lekha.UI
             TextMeshProUGUI placeholderTmp = placeholderObj.AddComponent<TextMeshProUGUI>();
             placeholderTmp.text = "Enter your name...";
             placeholderTmp.fontSize = 28;
-            placeholderTmp.color = new Color(CreamWhite.r, CreamWhite.g, CreamWhite.b, 0.4f);
+            placeholderTmp.color = new Color(TextWhite.r, TextWhite.g, TextWhite.b, 0.4f);
             placeholderTmp.alignment = TextAlignmentOptions.Left;
             placeholderTmp.fontStyle = FontStyles.Italic;
 
@@ -363,7 +364,7 @@ namespace Lekha.UI
             TextMeshProUGUI titleTmp = titleObj.AddComponent<TextMeshProUGUI>();
             titleTmp.text = "STATISTICS";
             titleTmp.fontSize = 18;
-            titleTmp.color = LuxuryGold;
+            titleTmp.color = AccentCyan;
             titleTmp.alignment = TextAlignmentOptions.Center;
             titleTmp.fontStyle = FontStyles.Bold;
 
@@ -380,7 +381,7 @@ namespace Lekha.UI
             statsText = statsObj.AddComponent<TextMeshProUGUI>();
             statsText.text = "Games: 0  |  Wins: 0  |  Win Rate: 0%";
             statsText.fontSize = 20;
-            statsText.color = CreamWhite;
+            statsText.color = TextWhite;
             statsText.alignment = TextAlignmentOptions.Center;
         }
 
@@ -410,7 +411,7 @@ namespace Lekha.UI
             Image img = btnObj.AddComponent<Image>();
             img.sprite = CreateRoundedRectSprite(128, 48, 12);
             img.type = Image.Type.Sliced;
-            img.color = isPrimary ? LuxuryGold : new Color(LuxuryGold.r, LuxuryGold.g, LuxuryGold.b, 0.2f);
+            img.color = isPrimary ? AccentCyan : new Color(AccentCyan.r, AccentCyan.g, AccentCyan.b, 0.2f);
 
             Button btn = btnObj.AddComponent<Button>();
             btn.targetGraphic = img;
@@ -418,9 +419,9 @@ namespace Lekha.UI
             ColorBlock colors = btn.colors;
             if (isPrimary)
             {
-                colors.normalColor = LuxuryGold;
-                colors.highlightedColor = BrightGold;
-                colors.pressedColor = new Color(LuxuryGold.r * 0.8f, LuxuryGold.g * 0.8f, LuxuryGold.b * 0.8f);
+                colors.normalColor = AccentCyan;
+                colors.highlightedColor = new Color(0.55f, 0.85f, 1f, 1f);
+                colors.pressedColor = new Color(AccentCyan.r * 0.8f, AccentCyan.g * 0.8f, AccentCyan.b * 0.8f);
             }
             else
             {
@@ -438,7 +439,7 @@ namespace Lekha.UI
             if (!isPrimary)
             {
                 Outline outline = btnObj.AddComponent<Outline>();
-                outline.effectColor = new Color(LuxuryGold.r, LuxuryGold.g, LuxuryGold.b, 0.5f);
+                outline.effectColor = new Color(AccentCyan.r, AccentCyan.g, AccentCyan.b, 0.5f);
                 outline.effectDistance = new Vector2(1.5f, -1.5f);
             }
 
@@ -455,7 +456,7 @@ namespace Lekha.UI
             tmp.text = text;
             tmp.fontSize = isPrimary ? 28 : 20;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = isPrimary ? DarkWood : CreamWhite;
+            tmp.color = isPrimary ? DarkBg : TextWhite;
             tmp.fontStyle = FontStyles.Bold;
         }
 
@@ -550,20 +551,20 @@ namespace Lekha.UI
             Button closeBgBtn = popupObj.AddComponent<Button>();
             closeBgBtn.onClick.AddListener(() => Destroy(popupObj));
 
-            // Options panel
+            // Options panel - taller to fit avatar presets
             GameObject optionsPanel = new GameObject("Options");
             optionsPanel.transform.SetParent(popupObj.transform, false);
 
             RectTransform optionsRect = optionsPanel.AddComponent<RectTransform>();
             optionsRect.anchorMin = new Vector2(0.5f, 0.5f);
             optionsRect.anchorMax = new Vector2(0.5f, 0.5f);
-            optionsRect.sizeDelta = new Vector2(350, 250);
+            optionsRect.sizeDelta = new Vector2(420, 520);
 
             Image optionsBg = optionsPanel.AddComponent<Image>();
-            optionsBg.color = DeepGreen;
+            optionsBg.color = DeepNavy;
 
             Outline optionsBorder = optionsPanel.AddComponent<Outline>();
-            optionsBorder.effectColor = LuxuryGold;
+            optionsBorder.effectColor = AccentCyan;
             optionsBorder.effectDistance = new Vector2(2, -2);
 
             // Title
@@ -574,23 +575,26 @@ namespace Lekha.UI
             titleRect.anchorMin = new Vector2(0.5f, 1f);
             titleRect.anchorMax = new Vector2(0.5f, 1f);
             titleRect.anchoredPosition = new Vector2(0, -30);
-            titleRect.sizeDelta = new Vector2(300, 40);
+            titleRect.sizeDelta = new Vector2(350, 40);
 
             TextMeshProUGUI titleTmp = titleObj.AddComponent<TextMeshProUGUI>();
             titleTmp.text = "CHOOSE AVATAR";
             titleTmp.fontSize = 24;
-            titleTmp.color = LuxuryGold;
+            titleTmp.color = AccentCyan;
             titleTmp.alignment = TextAlignmentOptions.Center;
             titleTmp.fontStyle = FontStyles.Bold;
 
+            // Cartoon Avatars section
+            CreatePresetAvatarsSection(optionsPanel.transform, popupObj);
+
             // Take Photo button
-            CreatePopupButton(optionsPanel.transform, "Take Photo", new Vector2(0, -80), () => {
+            CreatePopupButton(optionsPanel.transform, "Take Photo", new Vector2(0, -340), () => {
                 Destroy(popupObj);
                 TakePhoto();
             });
 
             // Choose from Gallery button
-            CreatePopupButton(optionsPanel.transform, "Choose from Gallery", new Vector2(0, -135), () => {
+            CreatePopupButton(optionsPanel.transform, "Choose from Gallery", new Vector2(0, -395), () => {
                 Destroy(popupObj);
                 ChooseFromGallery();
             });
@@ -599,10 +603,595 @@ namespace Lekha.UI
             var profile = PlayerProfileManager.Instance?.CurrentProfile;
             if (profile != null && profile.HasCustomAvatar)
             {
-                CreatePopupButton(optionsPanel.transform, "Remove Photo", new Vector2(0, -190), () => {
+                CreatePopupButton(optionsPanel.transform, "Remove Photo", new Vector2(0, -450), () => {
                     Destroy(popupObj);
                     RemoveAvatar();
                 });
+            }
+        }
+
+        private void CreatePresetAvatarsSection(Transform parent, GameObject popupToDestroy)
+        {
+            // Section label
+            GameObject labelObj = new GameObject("PresetsLabel");
+            labelObj.transform.SetParent(parent, false);
+
+            RectTransform labelRect = labelObj.AddComponent<RectTransform>();
+            labelRect.anchorMin = new Vector2(0.5f, 1f);
+            labelRect.anchorMax = new Vector2(0.5f, 1f);
+            labelRect.anchoredPosition = new Vector2(0, -70);
+            labelRect.sizeDelta = new Vector2(350, 25);
+
+            TextMeshProUGUI labelTmp = labelObj.AddComponent<TextMeshProUGUI>();
+            labelTmp.text = "PRESET AVATARS";
+            labelTmp.fontSize = 16;
+            labelTmp.color = new Color(TextWhite.r, TextWhite.g, TextWhite.b, 0.7f);
+            labelTmp.alignment = TextAlignmentOptions.Center;
+
+            // Avatar grid container
+            GameObject gridObj = new GameObject("AvatarGrid");
+            gridObj.transform.SetParent(parent, false);
+
+            RectTransform gridRect = gridObj.AddComponent<RectTransform>();
+            gridRect.anchorMin = new Vector2(0.5f, 1f);
+            gridRect.anchorMax = new Vector2(0.5f, 1f);
+            gridRect.anchoredPosition = new Vector2(0, -185);
+            gridRect.sizeDelta = new Vector2(380, 160);
+
+            GridLayoutGroup gridLayout = gridObj.AddComponent<GridLayoutGroup>();
+            gridLayout.cellSize = new Vector2(70, 70);
+            gridLayout.spacing = new Vector2(10, 10);
+            gridLayout.childAlignment = TextAnchor.MiddleCenter;
+            gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            gridLayout.constraintCount = 5;
+            gridLayout.padding = new RectOffset(5, 5, 5, 5);
+
+            // Create 10 preset avatars
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Smiley, new Color(1f, 0.85f, 0.3f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Cool, new Color(0.3f, 0.7f, 1f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Happy, new Color(0.5f, 0.9f, 0.5f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Star, new Color(1f, 0.6f, 0.8f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Heart, new Color(1f, 0.4f, 0.5f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Crown, new Color(0.95f, 0.75f, 0.3f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Diamond, new Color(0.6f, 0.8f, 1f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Flame, new Color(1f, 0.5f, 0.2f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Lightning, new Color(0.9f, 0.9f, 0.3f));
+            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Ace, new Color(0.2f, 0.2f, 0.3f));
+        }
+
+        private enum AvatarPresetType
+        {
+            Smiley,
+            Cool,
+            Happy,
+            Star,
+            Heart,
+            Crown,
+            Diamond,
+            Flame,
+            Lightning,
+            Ace
+        }
+
+        private void CreatePresetAvatarButton(Transform parent, GameObject popupToDestroy, AvatarPresetType type, Color baseColor)
+        {
+            GameObject btnObj = new GameObject($"Preset_{type}");
+            btnObj.transform.SetParent(parent, false);
+
+            Image btnImg = btnObj.AddComponent<Image>();
+            Texture2D avatarTex = CreatePresetAvatarTexture(type, baseColor);
+            btnImg.sprite = Sprite.Create(avatarTex, new Rect(0, 0, avatarTex.width, avatarTex.height), new Vector2(0.5f, 0.5f));
+            btnImg.preserveAspect = true;
+
+            Button btn = btnObj.AddComponent<Button>();
+            btn.targetGraphic = btnImg;
+
+            // Hover effect
+            ColorBlock colors = btn.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.1f, 1.1f, 1.1f);
+            colors.pressedColor = new Color(0.9f, 0.9f, 0.9f);
+            btn.colors = colors;
+
+            AvatarPresetType capturedType = type;
+            Color capturedColor = baseColor;
+
+            btn.onClick.AddListener(() => {
+                SoundManager.Instance?.PlayButtonClick();
+                ApplyPresetAvatar(capturedType, capturedColor);
+                if (popupToDestroy != null) Destroy(popupToDestroy);
+            });
+        }
+
+        private Texture2D CreatePresetAvatarTexture(AvatarPresetType type, Color baseColor)
+        {
+            int size = 128;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            Vector2 center = new Vector2(size / 2f, size / 2f);
+            float radius = size / 2f - 2;
+
+            // Fill with base color circle
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), center);
+                    if (dist <= radius)
+                    {
+                        // Gradient from center
+                        float t = dist / radius;
+                        Color c = Color.Lerp(baseColor * 1.1f, baseColor * 0.8f, t * 0.5f);
+                        tex.SetPixel(x, y, c);
+                    }
+                    else if (dist <= radius + 1.5f)
+                    {
+                        // Anti-aliased edge
+                        float alpha = 1f - (dist - radius) / 1.5f;
+                        tex.SetPixel(x, y, new Color(baseColor.r * 0.8f, baseColor.g * 0.8f, baseColor.b * 0.8f, alpha));
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                }
+            }
+
+            // Draw icon overlay
+            DrawPresetIcon(tex, type, size);
+
+            tex.Apply();
+            return tex;
+        }
+
+        private void DrawPresetIcon(Texture2D tex, AvatarPresetType type, int size)
+        {
+            Color iconColor = new Color(1f, 1f, 1f, 0.95f);
+            Color darkColor = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+            Vector2 center = new Vector2(size / 2f, size / 2f);
+
+            switch (type)
+            {
+                case AvatarPresetType.Smiley:
+                    // Simple smiley face
+                    DrawCircle(tex, new Vector2(size * 0.35f, size * 0.6f), 6, darkColor); // Left eye
+                    DrawCircle(tex, new Vector2(size * 0.65f, size * 0.6f), 6, darkColor); // Right eye
+                    DrawArc(tex, center, size * 0.25f, 200, 340, 4, darkColor); // Smile
+                    break;
+
+                case AvatarPresetType.Cool:
+                    // Sunglasses face
+                    DrawRect(tex, new Vector2(size * 0.2f, size * 0.55f), 25, 12, darkColor); // Left lens
+                    DrawRect(tex, new Vector2(size * 0.55f, size * 0.55f), 25, 12, darkColor); // Right lens
+                    DrawLine(tex, new Vector2(size * 0.45f, size * 0.6f), new Vector2(size * 0.55f, size * 0.6f), 3, darkColor); // Bridge
+                    DrawArc(tex, center, size * 0.2f, 210, 330, 3, darkColor); // Slight smile
+                    break;
+
+                case AvatarPresetType.Happy:
+                    // Big smile face
+                    DrawCircle(tex, new Vector2(size * 0.35f, size * 0.6f), 5, darkColor);
+                    DrawCircle(tex, new Vector2(size * 0.65f, size * 0.6f), 5, darkColor);
+                    DrawArc(tex, new Vector2(center.x, center.y - 5), size * 0.3f, 200, 340, 5, darkColor);
+                    break;
+
+                case AvatarPresetType.Star:
+                    // Star shape
+                    DrawStar(tex, center, size * 0.35f, 5, iconColor);
+                    break;
+
+                case AvatarPresetType.Heart:
+                    // Heart shape
+                    DrawHeart(tex, center, size * 0.35f, iconColor);
+                    break;
+
+                case AvatarPresetType.Crown:
+                    // Crown
+                    DrawCrown(tex, center, size * 0.4f, iconColor);
+                    break;
+
+                case AvatarPresetType.Diamond:
+                    // Diamond shape
+                    DrawDiamond(tex, center, size * 0.35f, iconColor);
+                    break;
+
+                case AvatarPresetType.Flame:
+                    // Flame
+                    DrawFlame(tex, center, size * 0.35f, iconColor);
+                    break;
+
+                case AvatarPresetType.Lightning:
+                    // Lightning bolt
+                    DrawLightning(tex, center, size * 0.35f, iconColor);
+                    break;
+
+                case AvatarPresetType.Ace:
+                    // Ace of spades symbol
+                    DrawSpade(tex, center, size * 0.35f, iconColor);
+                    break;
+            }
+        }
+
+        private void DrawCircle(Texture2D tex, Vector2 center, float radius, Color color)
+        {
+            int minX = Mathf.Max(0, (int)(center.x - radius - 1));
+            int maxX = Mathf.Min(tex.width, (int)(center.x + radius + 1));
+            int minY = Mathf.Max(0, (int)(center.y - radius - 1));
+            int maxY = Mathf.Min(tex.height, (int)(center.y + radius + 1));
+
+            for (int y = minY; y < maxY; y++)
+            {
+                for (int x = minX; x < maxX; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), center);
+                    if (dist <= radius)
+                    {
+                        Color existing = tex.GetPixel(x, y);
+                        tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
+                    }
+                }
+            }
+        }
+
+        private void DrawRect(Texture2D tex, Vector2 topLeft, float width, float height, Color color)
+        {
+            int minX = Mathf.Max(0, (int)topLeft.x);
+            int maxX = Mathf.Min(tex.width, (int)(topLeft.x + width));
+            int minY = Mathf.Max(0, (int)topLeft.y);
+            int maxY = Mathf.Min(tex.height, (int)(topLeft.y + height));
+
+            for (int y = minY; y < maxY; y++)
+            {
+                for (int x = minX; x < maxX; x++)
+                {
+                    Color existing = tex.GetPixel(x, y);
+                    tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
+                }
+            }
+        }
+
+        private void DrawLine(Texture2D tex, Vector2 start, Vector2 end, float thickness, Color color)
+        {
+            float dist = Vector2.Distance(start, end);
+            for (float t = 0; t <= 1; t += 1f / dist)
+            {
+                Vector2 point = Vector2.Lerp(start, end, t);
+                DrawCircle(tex, point, thickness / 2f, color);
+            }
+        }
+
+        private void DrawArc(Texture2D tex, Vector2 center, float radius, float startAngle, float endAngle, float thickness, Color color)
+        {
+            for (float angle = startAngle; angle <= endAngle; angle += 2)
+            {
+                float rad = angle * Mathf.Deg2Rad;
+                Vector2 point = center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * radius;
+                DrawCircle(tex, point, thickness / 2f, color);
+            }
+        }
+
+        private void DrawStar(Texture2D tex, Vector2 center, float radius, int points, Color color)
+        {
+            float innerRadius = radius * 0.4f;
+
+            for (int i = 0; i < points * 2; i++)
+            {
+                float angle1 = (i * 180f / points - 90) * Mathf.Deg2Rad;
+                float angle2 = ((i + 1) * 180f / points - 90) * Mathf.Deg2Rad;
+
+                float r1 = (i % 2 == 0) ? radius : innerRadius;
+                float r2 = ((i + 1) % 2 == 0) ? radius : innerRadius;
+
+                Vector2 p1 = center + new Vector2(Mathf.Cos(angle1), Mathf.Sin(angle1)) * r1;
+                Vector2 p2 = center + new Vector2(Mathf.Cos(angle2), Mathf.Sin(angle2)) * r2;
+
+                DrawLine(tex, p1, p2, 4, color);
+            }
+
+            // Fill center
+            DrawCircle(tex, center, innerRadius * 0.8f, color);
+        }
+
+        private void DrawHeart(Texture2D tex, Vector2 center, float size, Color color)
+        {
+            // Draw heart using two circles and a triangle
+            float circleRadius = size * 0.35f;
+            Vector2 leftCircle = center + new Vector2(-size * 0.25f, size * 0.15f);
+            Vector2 rightCircle = center + new Vector2(size * 0.25f, size * 0.15f);
+
+            // Fill circles
+            for (int y = 0; y < tex.height; y++)
+            {
+                for (int x = 0; x < tex.width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    float distLeft = Vector2.Distance(p, leftCircle);
+                    float distRight = Vector2.Distance(p, rightCircle);
+
+                    // Check if in circles
+                    if (distLeft <= circleRadius || distRight <= circleRadius)
+                    {
+                        Color existing = tex.GetPixel(x, y);
+                        tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
+                    }
+                    // Check if in lower triangle
+                    else if (y < center.y + size * 0.1f && y > center.y - size * 0.55f)
+                    {
+                        float width = (center.y + size * 0.1f - y) / (size * 0.65f) * size * 0.6f;
+                        if (Mathf.Abs(x - center.x) < width)
+                        {
+                            Color existing = tex.GetPixel(x, y);
+                            tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DrawCrown(Texture2D tex, Vector2 center, float size, Color color)
+        {
+            // Simple crown shape
+            float baseY = center.y - size * 0.3f;
+            float topY = center.y + size * 0.4f;
+
+            // Base rectangle
+            DrawRect(tex, new Vector2(center.x - size * 0.5f, baseY), size, size * 0.2f, color);
+
+            // Three points
+            Vector2[] points = {
+                new Vector2(center.x - size * 0.4f, baseY + size * 0.2f),
+                new Vector2(center.x - size * 0.25f, topY),
+                new Vector2(center.x, baseY + size * 0.35f),
+                new Vector2(center.x + size * 0.25f, topY),
+                new Vector2(center.x + size * 0.4f, baseY + size * 0.2f)
+            };
+
+            for (int i = 0; i < points.Length - 1; i++)
+            {
+                DrawLine(tex, points[i], points[i + 1], 6, color);
+            }
+
+            // Fill between points
+            for (int y = (int)baseY; y < (int)topY; y++)
+            {
+                for (int x = (int)(center.x - size * 0.5f); x < (int)(center.x + size * 0.5f); x++)
+                {
+                    if (x >= 0 && x < tex.width && y >= 0 && y < tex.height)
+                    {
+                        Vector2 p = new Vector2(x, y);
+                        // Simple check if point is inside crown shape
+                        if (y < baseY + size * 0.2f || IsInsideCrown(p, center, size, baseY))
+                        {
+                            Color existing = tex.GetPixel(x, y);
+                            if (existing.a < 0.5f) // Only fill if not already filled
+                                tex.SetPixel(x, y, Color.Lerp(existing, color, color.a * 0.9f));
+                        }
+                    }
+                }
+            }
+        }
+
+        private bool IsInsideCrown(Vector2 p, Vector2 center, float size, float baseY)
+        {
+            // Simplified crown check - just check if within general bounds
+            float normalizedX = (p.x - center.x) / size;
+            float normalizedY = (p.y - baseY) / size;
+
+            if (normalizedY < 0.2f) return Mathf.Abs(normalizedX) < 0.5f;
+
+            // Wavy top
+            float maxHeight = 0.7f - Mathf.Abs(Mathf.Sin(normalizedX * 4f)) * 0.35f;
+            return normalizedY < maxHeight && Mathf.Abs(normalizedX) < 0.5f;
+        }
+
+        private void DrawDiamond(Texture2D tex, Vector2 center, float size, Color color)
+        {
+            // Diamond shape (rotated square)
+            for (int y = 0; y < tex.height; y++)
+            {
+                for (int x = 0; x < tex.width; x++)
+                {
+                    float dx = Mathf.Abs(x - center.x);
+                    float dy = Mathf.Abs(y - center.y);
+
+                    if (dx / size + dy / (size * 1.3f) <= 1)
+                    {
+                        Color existing = tex.GetPixel(x, y);
+                        tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
+                    }
+                }
+            }
+        }
+
+        private void DrawFlame(Texture2D tex, Vector2 center, float size, Color color)
+        {
+            // Simplified flame shape
+            for (int y = 0; y < tex.height; y++)
+            {
+                for (int x = 0; x < tex.width; x++)
+                {
+                    float normalizedY = (y - center.y + size * 0.5f) / size;
+                    if (normalizedY < 0 || normalizedY > 1) continue;
+
+                    float maxWidth = size * 0.5f * (1 - normalizedY * 0.7f) * Mathf.Sin(normalizedY * Mathf.PI);
+                    maxWidth = Mathf.Max(maxWidth, size * 0.1f * (1 - normalizedY));
+
+                    if (Mathf.Abs(x - center.x) < maxWidth)
+                    {
+                        Color existing = tex.GetPixel(x, y);
+                        // Gradient from orange to yellow
+                        Color flameColor = Color.Lerp(color, new Color(1f, 0.95f, 0.4f), normalizedY);
+                        tex.SetPixel(x, y, Color.Lerp(existing, flameColor, color.a));
+                    }
+                }
+            }
+        }
+
+        private void DrawLightning(Texture2D tex, Vector2 center, float size, Color color)
+        {
+            // Lightning bolt - series of connected lines
+            Vector2[] points = {
+                center + new Vector2(size * 0.1f, size * 0.5f),
+                center + new Vector2(-size * 0.15f, size * 0.1f),
+                center + new Vector2(size * 0.15f, size * 0.05f),
+                center + new Vector2(-size * 0.1f, -size * 0.5f)
+            };
+
+            for (int i = 0; i < points.Length - 1; i++)
+            {
+                DrawLine(tex, points[i], points[i + 1], 8, color);
+            }
+        }
+
+        private void DrawSpade(Texture2D tex, Vector2 center, float size, Color color)
+        {
+            // Spade shape - inverted heart with stem
+            float circleRadius = size * 0.3f;
+            Vector2 leftCircle = center + new Vector2(-size * 0.22f, -size * 0.1f);
+            Vector2 rightCircle = center + new Vector2(size * 0.22f, -size * 0.1f);
+
+            for (int y = 0; y < tex.height; y++)
+            {
+                for (int x = 0; x < tex.width; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    float distLeft = Vector2.Distance(p, leftCircle);
+                    float distRight = Vector2.Distance(p, rightCircle);
+
+                    // Bottom circles
+                    if (distLeft <= circleRadius || distRight <= circleRadius)
+                    {
+                        Color existing = tex.GetPixel(x, y);
+                        tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
+                    }
+                    // Top point (inverted triangle)
+                    else if (y > center.y - size * 0.05f && y < center.y + size * 0.5f)
+                    {
+                        float width = (y - center.y + size * 0.05f) / (size * 0.55f) * size * 0.5f;
+                        width = Mathf.Max(0, size * 0.5f - width);
+                        if (Mathf.Abs(x - center.x) < width)
+                        {
+                            Color existing = tex.GetPixel(x, y);
+                            tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
+                        }
+                    }
+                    // Stem
+                    else if (y < center.y - size * 0.2f && y > center.y - size * 0.55f)
+                    {
+                        float stemWidth = size * 0.08f + (center.y - size * 0.2f - y) / (size * 0.35f) * size * 0.12f;
+                        if (Mathf.Abs(x - center.x) < stemWidth)
+                        {
+                            Color existing = tex.GetPixel(x, y);
+                            tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ApplyPresetAvatar(AvatarPresetType type, Color baseColor)
+        {
+            // Create the preset texture at higher resolution for saving
+            int size = 256;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            Vector2 center = new Vector2(size / 2f, size / 2f);
+            float radius = size / 2f - 2;
+
+            // Fill with base color circle
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), center);
+                    if (dist <= radius)
+                    {
+                        float t = dist / radius;
+                        Color c = Color.Lerp(baseColor * 1.1f, baseColor * 0.8f, t * 0.5f);
+                        tex.SetPixel(x, y, c);
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                }
+            }
+
+            // Draw icon overlay at 2x scale
+            DrawPresetIconScaled(tex, type, size);
+
+            tex.Apply();
+
+            // Save to profile
+            PlayerProfileManager.Instance?.SetAvatar(tex);
+
+            // Update display
+            var profile = PlayerProfileManager.Instance?.CurrentProfile;
+            if (profile != null)
+            {
+                UpdateAvatarDisplay(profile);
+            }
+        }
+
+        private void DrawPresetIconScaled(Texture2D tex, AvatarPresetType type, int size)
+        {
+            // Same as DrawPresetIcon but for larger texture
+            Color iconColor = new Color(1f, 1f, 1f, 0.95f);
+            Color darkColor = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+            Vector2 center = new Vector2(size / 2f, size / 2f);
+
+            // Scale factor (256/128 = 2)
+            float scale = size / 128f;
+
+            switch (type)
+            {
+                case AvatarPresetType.Smiley:
+                    DrawCircle(tex, new Vector2(size * 0.35f, size * 0.6f), 6 * scale, darkColor);
+                    DrawCircle(tex, new Vector2(size * 0.65f, size * 0.6f), 6 * scale, darkColor);
+                    DrawArc(tex, center, size * 0.25f, 200, 340, 4 * scale, darkColor);
+                    break;
+
+                case AvatarPresetType.Cool:
+                    DrawRect(tex, new Vector2(size * 0.2f, size * 0.55f), 25 * scale, 12 * scale, darkColor);
+                    DrawRect(tex, new Vector2(size * 0.55f, size * 0.55f), 25 * scale, 12 * scale, darkColor);
+                    DrawLine(tex, new Vector2(size * 0.45f, size * 0.6f), new Vector2(size * 0.55f, size * 0.6f), 3 * scale, darkColor);
+                    DrawArc(tex, center, size * 0.2f, 210, 330, 3 * scale, darkColor);
+                    break;
+
+                case AvatarPresetType.Happy:
+                    DrawCircle(tex, new Vector2(size * 0.35f, size * 0.6f), 5 * scale, darkColor);
+                    DrawCircle(tex, new Vector2(size * 0.65f, size * 0.6f), 5 * scale, darkColor);
+                    DrawArc(tex, new Vector2(center.x, center.y - 5 * scale), size * 0.3f, 200, 340, 5 * scale, darkColor);
+                    break;
+
+                case AvatarPresetType.Star:
+                    DrawStar(tex, center, size * 0.35f, 5, iconColor);
+                    break;
+
+                case AvatarPresetType.Heart:
+                    DrawHeart(tex, center, size * 0.35f, iconColor);
+                    break;
+
+                case AvatarPresetType.Crown:
+                    DrawCrown(tex, center, size * 0.4f, iconColor);
+                    break;
+
+                case AvatarPresetType.Diamond:
+                    DrawDiamond(tex, center, size * 0.35f, iconColor);
+                    break;
+
+                case AvatarPresetType.Flame:
+                    DrawFlame(tex, center, size * 0.35f, iconColor);
+                    break;
+
+                case AvatarPresetType.Lightning:
+                    DrawLightning(tex, center, size * 0.35f, iconColor);
+                    break;
+
+                case AvatarPresetType.Ace:
+                    DrawSpade(tex, center, size * 0.35f, iconColor);
+                    break;
             }
         }
 
@@ -618,7 +1207,7 @@ namespace Lekha.UI
             rect.sizeDelta = new Vector2(280, 45);
 
             Image img = btnObj.AddComponent<Image>();
-            img.color = new Color(LuxuryGold.r, LuxuryGold.g, LuxuryGold.b, 0.2f);
+            img.color = new Color(AccentCyan.r, AccentCyan.g, AccentCyan.b, 0.2f);
 
             Button btn = btnObj.AddComponent<Button>();
             btn.targetGraphic = img;
@@ -628,7 +1217,7 @@ namespace Lekha.UI
             });
 
             Outline outline = btnObj.AddComponent<Outline>();
-            outline.effectColor = new Color(LuxuryGold.r, LuxuryGold.g, LuxuryGold.b, 0.5f);
+            outline.effectColor = new Color(AccentCyan.r, AccentCyan.g, AccentCyan.b, 0.5f);
             outline.effectDistance = new Vector2(1, -1);
 
             GameObject textObj = new GameObject("Text");
@@ -642,7 +1231,7 @@ namespace Lekha.UI
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = text;
             tmp.fontSize = 20;
-            tmp.color = CreamWhite;
+            tmp.color = TextWhite;
             tmp.alignment = TextAlignmentOptions.Center;
         }
 
@@ -656,10 +1245,45 @@ namespace Lekha.UI
 
         private void ChooseFromGallery()
         {
-            // Gallery functionality requires NativeGallery plugin
-            // For now, create a random avatar
-            Debug.Log("Gallery not available - using generated avatar");
-            CreateTestAvatar();
+#if UNITY_ANDROID || UNITY_IOS
+            // Try NativeGallery if available
+            try
+            {
+                // Check if NativeGallery is available using reflection
+                System.Type nativeGalleryType = System.Type.GetType("NativeGallery, Assembly-CSharp");
+                if (nativeGalleryType != null)
+                {
+                    // NativeGallery is available - use it
+                    var getImageMethod = nativeGalleryType.GetMethod("GetImageFromGallery",
+                        new System.Type[] { typeof(System.Action<string>), typeof(string), typeof(string) });
+
+                    if (getImageMethod != null)
+                    {
+                        System.Action<string> callback = (path) => {
+                            if (!string.IsNullOrEmpty(path))
+                            {
+                                LoadImageFromPath(path);
+                            }
+                        };
+                        getImageMethod.Invoke(null, new object[] { callback, "Select Avatar", "image/*" });
+                        return;
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"NativeGallery not available: {e.Message}");
+            }
+#endif
+            // Fallback - show preset selection instead of random avatar
+            Debug.Log("Gallery not available on this platform - showing preset avatars");
+            ShowPresetAvatarFallback();
+        }
+
+        private void ShowPresetAvatarFallback()
+        {
+            // Just apply a nice default preset avatar instead of a beige square
+            ApplyPresetAvatar(AvatarPresetType.Smiley, new Color(0.3f, 0.7f, 1f));
         }
 
         private void LoadImageFromPath(string path)

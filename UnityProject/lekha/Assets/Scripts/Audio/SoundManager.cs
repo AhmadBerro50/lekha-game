@@ -43,6 +43,8 @@ namespace Lekha.Audio
             clips["button_click"] = GenerateButtonClickSound();
             clips["card_select"] = GenerateCardSelectSound();
             clips["card_hover"] = GenerateCardHoverSound();
+            clips["special_impact"] = GenerateSpecialImpactSound();
+            clips["special_impact_intense"] = GenerateSpecialImpactSoundIntense();
 
             Debug.Log($"SoundManager: Generated {clips.Count} sound effects");
         }
@@ -90,6 +92,14 @@ namespace Lekha.Audio
         public void PlayCardHover()
         {
             PlaySound("card_hover", 0.15f);
+        }
+
+        /// <summary>
+        /// Play dramatic impact sound for special cards (Queen of Spades, 10 of Diamonds)
+        /// </summary>
+        public void PlaySpecialCardImpact(bool intense = false)
+        {
+            PlaySound(intense ? "special_impact_intense" : "special_impact", 1.2f);
         }
 
         private void PlaySound(string soundName, float volumeMultiplier = 1f)
@@ -307,6 +317,104 @@ namespace Lekha.Audio
             AudioClip clip = AudioClip.Create(name, data.Length, 1, sampleRate, false);
             clip.SetData(data, 0);
             return clip;
+        }
+
+        /// <summary>
+        /// Generate impact/crack sound for special cards
+        /// </summary>
+        private AudioClip GenerateSpecialImpactSound()
+        {
+            int sampleRate = 44100;
+            int samples = sampleRate / 2; // 0.5 seconds
+            float[] data = new float[samples];
+
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / samples;
+
+                // Initial impact crack
+                float impact = 0;
+                if (t < 0.05f)
+                {
+                    float impactT = t / 0.05f;
+                    impact = (Random.value - 0.5f) * 2f * (1 - impactT);
+                    impact += Mathf.Sin(2 * Mathf.PI * 60 * i / sampleRate) * (1 - impactT) * 0.8f;
+                }
+
+                // Low rumble
+                float rumble = Mathf.Sin(2 * Mathf.PI * 40 * i / sampleRate) * Mathf.Exp(-t * 4f) * 0.4f;
+
+                // Crack/breaking texture
+                float crack = 0;
+                if (t < 0.2f)
+                {
+                    crack = (Random.value - 0.5f) * Mathf.Exp(-t * 15f) * 0.6f;
+                }
+
+                // Resonance
+                float resonance = Mathf.Sin(2 * Mathf.PI * 150 * i / sampleRate) * Mathf.Exp(-t * 6f) * 0.3f;
+
+                data[i] = impact + rumble + crack + resonance;
+                data[i] = Mathf.Clamp(data[i], -1f, 1f);
+            }
+
+            return CreateClip("special_impact", data, sampleRate);
+        }
+
+        /// <summary>
+        /// Generate more intense impact sound for Queen of Spades
+        /// </summary>
+        private AudioClip GenerateSpecialImpactSoundIntense()
+        {
+            int sampleRate = 44100;
+            int samples = (int)(sampleRate * 0.7f); // 0.7 seconds
+            float[] data = new float[samples];
+
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / samples;
+
+                // Heavy initial impact
+                float impact = 0;
+                if (t < 0.08f)
+                {
+                    float impactT = t / 0.08f;
+                    impact = (Random.value - 0.5f) * 2.5f * (1 - impactT);
+                    impact += Mathf.Sin(2 * Mathf.PI * 50 * i / sampleRate) * (1 - impactT);
+                }
+
+                // Deep bass rumble
+                float rumble = Mathf.Sin(2 * Mathf.PI * 30 * i / sampleRate) * Mathf.Exp(-t * 3f) * 0.5f;
+                rumble += Mathf.Sin(2 * Mathf.PI * 55 * i / sampleRate) * Mathf.Exp(-t * 4f) * 0.3f;
+
+                // Multiple crack layers
+                float crack = 0;
+                if (t < 0.3f)
+                {
+                    crack = (Random.value - 0.5f) * Mathf.Exp(-t * 10f) * 0.7f;
+                    // Secondary cracks
+                    if (t > 0.1f && t < 0.2f)
+                    {
+                        crack += (Random.value - 0.5f) * 0.4f;
+                    }
+                }
+
+                // Ominous tone
+                float ominous = Mathf.Sin(2 * Mathf.PI * 80 * i / sampleRate) * Mathf.Exp(-t * 3f) * 0.25f;
+                ominous += Mathf.Sin(2 * Mathf.PI * 120 * i / sampleRate) * Mathf.Exp(-t * 5f) * 0.15f;
+
+                // Shattering glass texture
+                float shatter = 0;
+                if (t < 0.15f)
+                {
+                    shatter = Mathf.Sin(2 * Mathf.PI * 2000 * i / sampleRate * (1 - t)) * Mathf.Exp(-t * 30f) * 0.2f;
+                }
+
+                data[i] = impact + rumble + crack + ominous + shatter;
+                data[i] = Mathf.Clamp(data[i], -1f, 1f);
+            }
+
+            return CreateClip("special_impact_intense", data, sampleRate);
         }
     }
 }

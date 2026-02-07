@@ -38,17 +38,24 @@ namespace Lekha.UI
         private Button passButton;
         private Button pauseButton;
         private Button scoreButton;
+        private Button emojiButton;
         private Image turnIndicator;
         private RectTransform[] playerIndicators = new RectTransform[4];
 
         [Header("Player Info Panels")]
         private Dictionary<PlayerPosition, PlayerInfoPanel> playerInfoPanels = new Dictionary<PlayerPosition, PlayerInfoPanel>();
         private ScoreSummaryPopup scoreSummaryPopup;
+        private EmojiReactionSystem emojiSystem;
+
+        // Emoji panel - managed directly by GameUI to avoid destruction issues
+        private GameObject emojiPanelObj;
+        private CanvasGroup emojiPanelCanvasGroup;
+        private bool isEmojiPanelOpen = false;
 
         [Header("Card Settings")]
-        private float cardWidth = 180f; // Smaller cards for Jawaker-style
-        private float cardHeight = 260f;
-        private float cardSpacing = 45f; // Tight overlap like Jawaker
+        private float cardWidth = 260f; // Much bigger cards for better visibility
+        private float cardHeight = 370f;
+        private float cardSpacing = 110f; // Wide spread to use full screen width
 
         [Header("State")]
         private List<CardUI> playerHandCards = new List<CardUI>();
@@ -136,6 +143,11 @@ namespace Lekha.UI
                         Debug.Log($"[Watchdog] Triggering AI play for {currentPlayer.PlayerName}");
                         AIPlayCard();
                     }
+                    else if (GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
+                    {
+                        Debug.Log($"[Watchdog] HOST triggering AI for disconnected {currentPlayer.PlayerName}");
+                        AIPlayCard();
+                    }
                     else
                     {
                         Debug.Log($"[Watchdog] Waiting for remote player {currentPlayer.PlayerName}");
@@ -153,6 +165,8 @@ namespace Lekha.UI
         /// </summary>
         public void Cleanup()
         {
+            Debug.Log($"[GameUI] Cleanup called! Stack trace:\n{System.Environment.StackTrace}");
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnCardsDealt -= OnCardsDealt;
@@ -163,6 +177,14 @@ namespace Lekha.UI
                 GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
                 GameManager.Instance.OnPassPhaseComplete -= OnPassPhaseComplete;
                 GameManager.Instance.OnTrickStarted -= OnTrickStarted;
+            }
+
+            // Unsubscribe from disconnect events
+            if (NetworkGameSync.Instance != null)
+            {
+                NetworkGameSync.Instance.OnPlayerDisconnectedUI -= OnPlayerDisconnectedUI;
+                NetworkGameSync.Instance.OnPlayerReconnectedUI -= OnPlayerReconnectedUI;
+                NetworkGameSync.Instance.OnBotReplacedUI -= OnBotReplacedUI;
             }
 
             // Destroy the canvas and null out references
@@ -308,8 +330,28 @@ namespace Lekha.UI
             // Create score summary button (next to pause) - opens score popup
             scoreButton = CreateScoreButton(canvasTransform);
 
+            // Create emoji button (under round label) - opens emoji panel
+            emojiButton = CreateEmojiButton(canvasTransform);
+
             // Create score summary popup
             scoreSummaryPopup = ScoreSummaryPopup.Create(canvasTransform);
+
+            // Create emoji panel directly in GameUI (no separate component - avoids destruction issues)
+            CreateEmojiPanel(canvasTransform);
+
+            // Create disconnect notification banner (centered, for online games)
+            DisconnectNotification.Create(canvasTransform);
+
+            // Create ping display (top right, always visible in online games)
+            PingDisplay.Create(canvasTransform);
+
+            // Create special card effect system
+            Debug.Log("[GameUI] Creating SpecialCardEffect...");
+            GameObject specialEffectObj = new GameObject("SpecialCardEffect");
+            specialEffectObj.transform.SetParent(canvasTransform, false);
+            SpecialCardEffect specialEffect = specialEffectObj.AddComponent<SpecialCardEffect>();
+            specialEffect.Initialize(mainCanvas);
+            Debug.Log($"[GameUI] SpecialCardEffect created. Instance={SpecialCardEffect.Instance != null}");
 
             Debug.Log("GameUI created successfully with modern animations");
         }
@@ -346,14 +388,15 @@ namespace Lekha.UI
             }
             playerInfoPanels.Clear();
 
-            // Create panel for each player
+            // Create panel for each player with visual position mapping
             foreach (var player in GameManager.Instance.Players)
             {
                 if (player != null)
                 {
-                    var panel = PlayerInfoPanel.Create(canvasTransform, player, player.Position);
+                    var visualPos = GameManager.Instance.GetVisualPosition(player.Position);
+                    var panel = PlayerInfoPanel.Create(canvasTransform, player, player.Position, visualPos);
                     playerInfoPanels[player.Position] = panel;
-                    Debug.Log($"[CreatePlayerInfoPanels] Created panel for {player.PlayerName} at {player.Position}");
+                    Debug.Log($"[CreatePlayerInfoPanels] Created panel for {player.PlayerName} at {player.Position} (visual: {visualPos})");
                 }
             }
 
@@ -380,7 +423,7 @@ namespace Lekha.UI
             RectTransform rect = btnObj.AddComponent<RectTransform>();
             rect.anchorMin = new Vector2(1, 1);
             rect.anchorMax = new Vector2(1, 1);
-            rect.anchoredPosition = new Vector2(-120, -30); // Top right, next to pause
+            rect.anchoredPosition = new Vector2(-130, -50); // Top right, next to pause (moved in from edge)
             rect.sizeDelta = new Vector2(50, 50);
 
             Image img = btnObj.AddComponent<Image>();
@@ -388,26 +431,31 @@ namespace Lekha.UI
             Button btn = btnObj.AddComponent<Button>();
             btn.targetGraphic = img;
 
-            // Casino-style button with team color
+            // Modern glass button with cyan accent
+            Color accentCyan = new Color(0.40f, 0.75f, 1f, 1f);
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
             {
                 img.sprite = ModernUITheme.Instance.CircleSprite;
-                img.color = ModernUITheme.TeamNorthSouth;
+                img.color = new Color(0.16f, 0.14f, 0.28f, 0.95f);
 
                 ColorBlock colors = btn.colors;
-                colors.normalColor = ModernUITheme.TeamNorthSouth;
-                colors.highlightedColor = new Color(0.45f, 0.75f, 0.95f, 1f);
-                colors.pressedColor = new Color(0.25f, 0.50f, 0.70f, 1f);
-                colors.selectedColor = ModernUITheme.TeamNorthSouth;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+                colors.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+                colors.selectedColor = Color.white;
                 btn.colors = colors;
 
                 Shadow shadow = btnObj.AddComponent<Shadow>();
-                shadow.effectColor = new Color(0, 0, 0, 0.5f);
-                shadow.effectDistance = new Vector2(2, -2);
+                shadow.effectColor = new Color(0.40f, 0.75f, 1f, 0.3f);
+                shadow.effectDistance = new Vector2(0, -2);
+
+                Outline outline = btnObj.AddComponent<Outline>();
+                outline.effectColor = new Color(0.40f, 0.75f, 1f, 0.5f);
+                outline.effectDistance = new Vector2(1, -1);
             }
             else
             {
-                img.color = ModernUITheme.TeamNorthSouth;
+                img.color = accentCyan;
             }
 
             btn.onClick.AddListener(() => {
@@ -431,7 +479,7 @@ namespace Lekha.UI
             iconTmp.text = "i";
             iconTmp.fontSize = 26;
             iconTmp.alignment = TextAlignmentOptions.Center;
-            iconTmp.color = Color.white;
+            iconTmp.color = new Color(0.40f, 0.75f, 1f, 1f);
             iconTmp.fontStyle = FontStyles.Bold | FontStyles.Italic;
 
             return btn;
@@ -445,7 +493,7 @@ namespace Lekha.UI
             RectTransform rect = btnObj.AddComponent<RectTransform>();
             rect.anchorMin = new Vector2(1, 1);
             rect.anchorMax = new Vector2(1, 1);
-            rect.anchoredPosition = new Vector2(-60, -30); // Top right corner
+            rect.anchoredPosition = new Vector2(-70, -50); // Top right corner (moved in from edge)
             rect.sizeDelta = new Vector2(50, 50);
 
             Image img = btnObj.AddComponent<Image>();
@@ -453,26 +501,31 @@ namespace Lekha.UI
             Button btn = btnObj.AddComponent<Button>();
             btn.targetGraphic = img;
 
-            // Casino-style gold button
+            // Modern glass button with magenta accent
+            Color accentMagenta = new Color(0.85f, 0.45f, 0.95f, 1f);
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
             {
                 img.sprite = ModernUITheme.Instance.CircleSprite;
-                img.color = ModernUITheme.GoldAccent;
+                img.color = new Color(0.16f, 0.14f, 0.28f, 0.95f);
 
                 ColorBlock colors = btn.colors;
-                colors.normalColor = ModernUITheme.GoldAccent;
-                colors.highlightedColor = ModernUITheme.GoldBright;
-                colors.pressedColor = ModernUITheme.GoldDark;
-                colors.selectedColor = ModernUITheme.GoldAccent;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+                colors.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+                colors.selectedColor = Color.white;
                 btn.colors = colors;
 
                 Shadow shadow = btnObj.AddComponent<Shadow>();
-                shadow.effectColor = new Color(0, 0, 0, 0.5f);
-                shadow.effectDistance = new Vector2(2, -2);
+                shadow.effectColor = new Color(0.85f, 0.45f, 0.95f, 0.3f);
+                shadow.effectDistance = new Vector2(0, -2);
+
+                Outline outline = btnObj.AddComponent<Outline>();
+                outline.effectColor = new Color(0.85f, 0.45f, 0.95f, 0.5f);
+                outline.effectDistance = new Vector2(1, -1);
             }
             else
             {
-                img.color = ModernUITheme.GoldAccent;
+                img.color = accentMagenta;
             }
 
             btn.onClick.AddListener(() => {
@@ -496,69 +549,402 @@ namespace Lekha.UI
             iconTmp.text = "||";
             iconTmp.fontSize = 22;
             iconTmp.alignment = TextAlignmentOptions.Center;
-            iconTmp.color = ModernUITheme.PrimaryDark;
+            iconTmp.color = accentMagenta;
             iconTmp.fontStyle = FontStyles.Bold;
 
             return btn;
         }
 
-        private void CreateBackground(Transform parent)
+        private Button CreateEmojiButton(Transform parent)
         {
-            // Jawaker-style: Dark outer background with oval green felt table
+            // EXACT SAME PATTERN AS PAUSE BUTTON - THIS WILL WORK
+            GameObject btnObj = new GameObject("EmojiButton");
+            btnObj.transform.SetParent(parent, false);
 
-            // 1. Dark outer background (covers entire screen)
-            GameObject outerBg = new GameObject("OuterBackground");
-            outerBg.transform.SetParent(parent, false);
-            Image outerImg = outerBg.AddComponent<Image>();
-            outerImg.color = new Color(0.08f, 0.12f, 0.08f, 1f); // Dark greenish-black
-            RectTransform outerRect = outerBg.GetComponent<RectTransform>();
-            outerRect.anchorMin = Vector2.zero;
-            outerRect.anchorMax = Vector2.one;
-            outerRect.sizeDelta = Vector2.zero;
-            outerImg.raycastTarget = false;
+            RectTransform rect = btnObj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 1); // TOP LEFT (under round label)
+            rect.anchorMax = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(150, -95); // Under Round label, pushed right to avoid camera
+            rect.sizeDelta = new Vector2(50, 50);
 
-            // 2. Create oval table in center
-            CreateOvalTable(parent);
+            Image img = btnObj.AddComponent<Image>();
+
+            Button btn = btnObj.AddComponent<Button>();
+            btn.targetGraphic = img;
+
+            // Yellow/gold accent for emoji button
+            Color accentGold = new Color(1f, 0.85f, 0.3f, 1f);
+            if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
+            {
+                img.sprite = ModernUITheme.Instance.CircleSprite;
+                img.color = new Color(0.2f, 0.25f, 0.45f, 0.98f); // Dark blue background
+
+                ColorBlock colors = btn.colors;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+                colors.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+                colors.selectedColor = Color.white;
+                btn.colors = colors;
+
+                Shadow shadow = btnObj.AddComponent<Shadow>();
+                shadow.effectColor = new Color(1f, 0.85f, 0.3f, 0.3f);
+                shadow.effectDistance = new Vector2(0, -2);
+
+                Outline outline = btnObj.AddComponent<Outline>();
+                outline.effectColor = new Color(1f, 0.85f, 0.3f, 0.7f);
+                outline.effectDistance = new Vector2(2, -2);
+            }
+            else
+            {
+                img.color = accentGold;
+            }
+
+            btn.onClick.AddListener(() => {
+                Debug.Log("[GameUI] Emoji btn clicked - toggling panel directly");
+                SoundManager.Instance?.PlayButtonClick();
+                ToggleEmojiPanel();
+            });
+
+            // Plus icon
+            GameObject iconObj = new GameObject("Icon");
+            iconObj.transform.SetParent(btnObj.transform, false);
+
+            RectTransform iconRect = iconObj.AddComponent<RectTransform>();
+            iconRect.anchorMin = Vector2.zero;
+            iconRect.anchorMax = Vector2.one;
+            iconRect.sizeDelta = Vector2.zero;
+
+            TextMeshProUGUI iconTmp = iconObj.AddComponent<TextMeshProUGUI>();
+            iconTmp.text = "+";
+            iconTmp.fontSize = 28;
+            iconTmp.alignment = TextAlignmentOptions.Center;
+            iconTmp.color = accentGold;
+            iconTmp.fontStyle = FontStyles.Bold;
+            iconTmp.raycastTarget = false;
+
+            Debug.Log($"[GameUI] Emoji button created at {rect.anchoredPosition}");
+
+            return btn;
         }
 
         /// <summary>
-        /// Create Jawaker-style oval green felt table
+        /// Create the emoji panel directly in GameUI (avoids separate component destruction issues)
         /// </summary>
-        private void CreateOvalTable(Transform parent)
+        private void CreateEmojiPanel(Transform parent)
         {
-            // Table dimensions (oval shape in center)
-            float tableWidth = 1400f;
-            float tableHeight = 750f;
+            emojiPanelObj = new GameObject("EmojiPanel");
+            emojiPanelObj.transform.SetParent(parent, false);
+            emojiPanelObj.transform.SetAsLastSibling(); // Render on top
 
-            // Create table shadow (slightly larger, darker)
-            GameObject shadowObj = new GameObject("TableShadow");
-            shadowObj.transform.SetParent(parent, false);
-            RectTransform shadowRect = shadowObj.AddComponent<RectTransform>();
-            shadowRect.anchorMin = new Vector2(0.5f, 0.5f);
-            shadowRect.anchorMax = new Vector2(0.5f, 0.5f);
-            shadowRect.sizeDelta = new Vector2(tableWidth + 30, tableHeight + 30);
-            shadowRect.anchoredPosition = new Vector2(5, -5);
+            RectTransform panelRect = emojiPanelObj.AddComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.sizeDelta = new Vector2(200, 220);
+            panelRect.anchoredPosition = Vector2.zero;
 
-            Image shadowImg = shadowObj.AddComponent<Image>();
-            shadowImg.sprite = CreateOvalSprite(256, 160);
-            shadowImg.color = new Color(0, 0, 0, 0.5f);
-            shadowImg.raycastTarget = false;
+            emojiPanelCanvasGroup = emojiPanelObj.AddComponent<CanvasGroup>();
+            emojiPanelCanvasGroup.alpha = 0;
+            emojiPanelCanvasGroup.blocksRaycasts = false;
+            emojiPanelCanvasGroup.interactable = false;
 
-            // Create table border (dark green rim)
-            GameObject borderObj = new GameObject("TableBorder");
-            borderObj.transform.SetParent(parent, false);
-            RectTransform borderRect = borderObj.AddComponent<RectTransform>();
-            borderRect.anchorMin = new Vector2(0.5f, 0.5f);
-            borderRect.anchorMax = new Vector2(0.5f, 0.5f);
-            borderRect.sizeDelta = new Vector2(tableWidth + 20, tableHeight + 20);
-            borderRect.anchoredPosition = Vector2.zero;
+            // Dark glassmorphism background
+            Image panelBg = emojiPanelObj.AddComponent<Image>();
+            panelBg.color = new Color(0.08f, 0.10f, 0.15f, 0.95f);
+            if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
+            {
+                panelBg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
+                panelBg.type = Image.Type.Sliced;
+            }
 
-            Image borderImg = borderObj.AddComponent<Image>();
-            borderImg.sprite = CreateOvalSprite(256, 160);
-            borderImg.color = new Color(0.15f, 0.25f, 0.15f, 1f); // Dark green border
-            borderImg.raycastTarget = false;
+            // Grid layout for emoji buttons
+            GameObject layoutObj = new GameObject("EmojiLayout");
+            layoutObj.transform.SetParent(emojiPanelObj.transform, false);
+            RectTransform layoutRect = layoutObj.AddComponent<RectTransform>();
+            layoutRect.anchorMin = Vector2.zero;
+            layoutRect.anchorMax = Vector2.one;
+            layoutRect.sizeDelta = Vector2.zero;
+            layoutRect.anchoredPosition = Vector2.zero;
 
-            // Create main table surface (green felt)
+            GridLayoutGroup layout = layoutObj.AddComponent<GridLayoutGroup>();
+            layout.cellSize = new Vector2(50, 50);
+            layout.spacing = new Vector2(6, 6);
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            layout.constraintCount = 3;
+            layout.padding = new RectOffset(8, 8, 8, 8);
+
+            // Create emoji buttons
+            var reactions = new (string name, Color color)[]
+            {
+                ("laugh", new Color(1f, 0.85f, 0.2f)),
+                ("angry", new Color(0.95f, 0.3f, 0.3f)),
+                ("clap", new Color(0.3f, 0.9f, 0.4f)),
+                ("sad", new Color(0.4f, 0.6f, 0.95f)),
+                ("cool", new Color(0.2f, 0.8f, 0.9f)),
+                ("fire", new Color(1f, 0.5f, 0.2f)),
+                ("heart_broken", new Color(0.9f, 0.4f, 0.6f)),
+                ("party", new Color(0.7f, 0.4f, 0.95f)),
+                ("thumbsup", new Color(0.3f, 0.7f, 1f))
+            };
+
+            foreach (var reaction in reactions)
+            {
+                CreateEmojiReactionButton(layoutObj.transform, reaction.name, reaction.color);
+            }
+
+            emojiPanelObj.SetActive(false);
+            Debug.Log("[GameUI] Emoji panel created directly in GameUI");
+        }
+
+        private void CreateEmojiReactionButton(Transform parent, string emojiName, Color accentColor)
+        {
+            GameObject btnObj = new GameObject($"Reaction_{emojiName}");
+            btnObj.transform.SetParent(parent, false);
+
+            RectTransform btnRect = btnObj.AddComponent<RectTransform>();
+            btnRect.sizeDelta = new Vector2(50, 50);
+
+            // Background with accent color
+            Image bg = btnObj.AddComponent<Image>();
+            bg.color = new Color(accentColor.r * 0.3f, accentColor.g * 0.3f, accentColor.b * 0.3f, 0.95f);
+            bg.raycastTarget = true;
+            if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
+            {
+                bg.sprite = ModernUITheme.Instance.CircleSprite;
+            }
+
+            // Colored outline
+            Outline outline = btnObj.AddComponent<Outline>();
+            outline.effectColor = new Color(accentColor.r, accentColor.g, accentColor.b, 0.9f);
+            outline.effectDistance = new Vector2(2, -2);
+
+            // Emoji sprite
+            GameObject spriteObj = new GameObject("EmojiSprite");
+            spriteObj.transform.SetParent(btnObj.transform, false);
+            RectTransform spriteRect = spriteObj.AddComponent<RectTransform>();
+            spriteRect.anchorMin = new Vector2(0.1f, 0.1f);
+            spriteRect.anchorMax = new Vector2(0.9f, 0.9f);
+            spriteRect.sizeDelta = Vector2.zero;
+            spriteRect.anchoredPosition = Vector2.zero;
+
+            Image emojiImage = spriteObj.AddComponent<Image>();
+            emojiImage.sprite = EmojiReactionSystem.GetEmojiSprite(emojiName);
+            emojiImage.preserveAspect = true;
+            emojiImage.raycastTarget = false;
+
+            // Button
+            Button btn = btnObj.AddComponent<Button>();
+            btn.targetGraphic = bg;
+
+            ColorBlock colors = btn.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(1.2f, 1.2f, 1.2f);
+            colors.pressedColor = new Color(0.85f, 0.85f, 0.85f);
+            btn.colors = colors;
+
+            string capturedName = emojiName;
+            btn.onClick.AddListener(() => OnEmojiSelected(capturedName));
+        }
+
+        private void OnEmojiSelected(string emoji)
+        {
+            Debug.Log($"[GameUI] Emoji selected: {emoji}");
+            SoundManager.Instance?.PlayButtonClick();
+
+            // Show emoji for the local player
+            Player localPlayer = GameManager.Instance?.GetHumanPlayer();
+            PlayerPosition localPos = localPlayer?.Position ?? PlayerPosition.South;
+            if (playerInfoPanels.TryGetValue(localPos, out PlayerInfoPanel panel))
+            {
+                panel.ShowEmoji(emoji);
+            }
+
+            CloseEmojiPanel();
+        }
+
+        private void ToggleEmojiPanel()
+        {
+            if (isEmojiPanelOpen)
+                CloseEmojiPanel();
+            else
+                OpenEmojiPanel();
+        }
+
+        private void OpenEmojiPanel()
+        {
+            if (emojiPanelObj == null)
+            {
+                Debug.LogError("[GameUI] emojiPanelObj is null!");
+                return;
+            }
+            if (isEmojiPanelOpen) return;
+
+            isEmojiPanelOpen = true;
+            emojiPanelObj.SetActive(true);
+            emojiPanelObj.transform.SetAsLastSibling(); // Ensure on top
+
+            if (emojiPanelCanvasGroup != null)
+            {
+                emojiPanelCanvasGroup.alpha = 1;
+                emojiPanelCanvasGroup.blocksRaycasts = true;
+                emojiPanelCanvasGroup.interactable = true;
+            }
+
+            Debug.Log("[GameUI] Emoji panel opened");
+
+            // Auto-close after 5 seconds
+            StartCoroutine(AutoCloseEmojiPanel());
+        }
+
+        private void CloseEmojiPanel()
+        {
+            if (!isEmojiPanelOpen) return;
+
+            isEmojiPanelOpen = false;
+
+            if (emojiPanelCanvasGroup != null)
+            {
+                emojiPanelCanvasGroup.alpha = 0;
+                emojiPanelCanvasGroup.blocksRaycasts = false;
+                emojiPanelCanvasGroup.interactable = false;
+            }
+
+            if (emojiPanelObj != null)
+            {
+                emojiPanelObj.SetActive(false);
+            }
+
+            Debug.Log("[GameUI] Emoji panel closed");
+        }
+
+        private System.Collections.IEnumerator AutoCloseEmojiPanel()
+        {
+            yield return new WaitForSeconds(5f);
+            CloseEmojiPanel();
+        }
+
+        private void CreateBackground(Transform parent)
+        {
+            // Elegant gradient background - deep purple to dark teal
+
+            // Base layer - modern deep navy to purple gradient
+            GameObject baseBg = new GameObject("BaseBackground");
+            baseBg.transform.SetParent(parent, false);
+            Image baseImg = baseBg.AddComponent<Image>();
+            baseImg.sprite = CreateVerticalGradientSprite(64, new Color(0.06f, 0.08f, 0.14f, 1f), new Color(0.12f, 0.08f, 0.22f, 1f));
+            RectTransform baseRect = baseBg.GetComponent<RectTransform>();
+            baseRect.anchorMin = Vector2.zero;
+            baseRect.anchorMax = Vector2.one;
+            baseRect.sizeDelta = Vector2.zero;
+            baseImg.raycastTarget = false;
+
+            // Corner vignette overlay for depth
+            GameObject vignetteObj = new GameObject("Vignette");
+            vignetteObj.transform.SetParent(parent, false);
+            Image vignetteImg = vignetteObj.AddComponent<Image>();
+            vignetteImg.sprite = CreateVignetteSprite(128);
+            vignetteImg.color = new Color(0, 0, 0, 0.4f);
+            RectTransform vignetteRect = vignetteObj.GetComponent<RectTransform>();
+            vignetteRect.anchorMin = Vector2.zero;
+            vignetteRect.anchorMax = Vector2.one;
+            vignetteRect.sizeDelta = Vector2.zero;
+            vignetteImg.raycastTarget = false;
+
+            // Create modern card table
+            CreateModernTable(parent);
+        }
+
+        /// <summary>
+        /// Create vertical gradient sprite (top to bottom)
+        /// </summary>
+        private Sprite CreateVerticalGradientSprite(int height, Color topColor, Color bottomColor)
+        {
+            Texture2D tex = new Texture2D(1, height, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            for (int y = 0; y < height; y++)
+            {
+                float t = (float)y / (height - 1);
+                Color c = Color.Lerp(bottomColor, topColor, t);
+                tex.SetPixel(0, y, c);
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, 1, height), new Vector2(0.5f, 0.5f));
+        }
+
+        /// <summary>
+        /// Create vignette sprite (dark corners, lighter center)
+        /// </summary>
+        private Sprite CreateVignetteSprite(int size)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            Vector2 center = new Vector2(size / 2f, size / 2f);
+            float maxDist = center.magnitude;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), center) / maxDist;
+                    float alpha = Mathf.Pow(dist, 1.5f); // Gentle falloff
+                    tex.SetPixel(x, y, new Color(0, 0, 0, alpha));
+                }
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        /// <summary>
+        /// Create a modern, inviting card table with elegant design
+        /// </summary>
+        private void CreateModernTable(Transform parent)
+        {
+            // Larger table dimensions for better visibility
+            float tableWidth = 1600f;
+            float tableHeight = 900f;
+
+            // Wood frame/border - warm mahogany
+            GameObject frameObj = new GameObject("TableFrame");
+            frameObj.transform.SetParent(parent, false);
+            RectTransform frameRect = frameObj.AddComponent<RectTransform>();
+            frameRect.anchorMin = new Vector2(0.5f, 0.5f);
+            frameRect.anchorMax = new Vector2(0.5f, 0.5f);
+            frameRect.sizeDelta = new Vector2(tableWidth + 40, tableHeight + 40);
+            frameRect.anchoredPosition = Vector2.zero;
+
+            Image frameImg = frameObj.AddComponent<Image>();
+            frameImg.sprite = CreateRoundedRectSprite(128, 80, 20);
+            frameImg.type = Image.Type.Sliced;
+            frameImg.color = new Color(0.12f, 0.10f, 0.22f, 0.95f); // Modern dark purple frame
+            frameImg.raycastTarget = false;
+
+            // Subtle shadow
+            Shadow frameShadow = frameObj.AddComponent<Shadow>();
+            frameShadow.effectColor = new Color(0, 0, 0, 0.4f);
+            frameShadow.effectDistance = new Vector2(0, -4);
+
+            // Cyan glow trim accent
+            GameObject trimObj = new GameObject("CyanTrim");
+            trimObj.transform.SetParent(parent, false);
+            RectTransform trimRect = trimObj.AddComponent<RectTransform>();
+            trimRect.anchorMin = new Vector2(0.5f, 0.5f);
+            trimRect.anchorMax = new Vector2(0.5f, 0.5f);
+            trimRect.sizeDelta = new Vector2(tableWidth + 16, tableHeight + 16);
+            trimRect.anchoredPosition = Vector2.zero;
+
+            Image trimImg = trimObj.AddComponent<Image>();
+            trimImg.sprite = CreateRoundedRectSprite(128, 80, 18);
+            trimImg.type = Image.Type.Sliced;
+            trimImg.color = new Color(0.40f, 0.75f, 1f, 0.20f); // Subtle cyan accent glow
+            trimImg.raycastTarget = false;
+
+            // Main table surface - modern dark glass
             GameObject tableObj = new GameObject("TableSurface");
             tableObj.transform.SetParent(parent, false);
             RectTransform tableRect = tableObj.AddComponent<RectTransform>();
@@ -568,23 +954,94 @@ namespace Lekha.UI
             tableRect.anchoredPosition = Vector2.zero;
 
             Image tableImg = tableObj.AddComponent<Image>();
-            tableImg.sprite = CreateOvalSprite(256, 160);
-            tableImg.color = new Color(0.18f, 0.45f, 0.25f, 1f); // Jawaker green felt
+            tableImg.sprite = CreateRoundedRectSprite(128, 80, 16);
+            tableImg.type = Image.Type.Sliced;
+            tableImg.color = new Color(0.08f, 0.10f, 0.16f, 0.92f); // Modern dark glass surface
             tableImg.raycastTarget = false;
 
-            // Inner lighter highlight (subtle)
+            // Center gradient highlight - cyan/magenta glow
             GameObject highlightObj = new GameObject("TableHighlight");
             highlightObj.transform.SetParent(parent, false);
             RectTransform highlightRect = highlightObj.AddComponent<RectTransform>();
             highlightRect.anchorMin = new Vector2(0.5f, 0.5f);
             highlightRect.anchorMax = new Vector2(0.5f, 0.5f);
-            highlightRect.sizeDelta = new Vector2(tableWidth - 100, tableHeight - 60);
-            highlightRect.anchoredPosition = Vector2.zero;
+            highlightRect.sizeDelta = new Vector2(tableWidth - 200, tableHeight - 150);
+            highlightRect.anchoredPosition = new Vector2(0, 20); // Slightly offset up
 
             Image highlightImg = highlightObj.AddComponent<Image>();
-            highlightImg.sprite = CreateOvalSprite(256, 160);
-            highlightImg.color = new Color(0.22f, 0.52f, 0.30f, 0.4f); // Lighter center
+            highlightImg.sprite = CreateSoftGlowSprite(128);
+            highlightImg.color = new Color(0.30f, 0.50f, 0.85f, 0.12f); // Subtle cyan/blue glow
             highlightImg.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// Create a rounded rectangle sprite
+        /// </summary>
+        private Sprite CreateRoundedRectSprite(int width, int height, int cornerRadius)
+        {
+            Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    bool inside = IsInsideRoundedRect(x, y, width, height, cornerRadius);
+                    tex.SetPixel(x, y, inside ? Color.white : Color.clear);
+                }
+            }
+
+            tex.Apply();
+
+            // Create sliced sprite with proper border for 9-slicing
+            int border = cornerRadius + 2;
+            return Sprite.Create(tex, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100, 0,
+                SpriteMeshType.FullRect, new Vector4(border, border, border, border));
+        }
+
+        private bool IsInsideRoundedRect(int x, int y, int width, int height, int radius)
+        {
+            // Check corners
+            if (x < radius && y < radius)
+                return Vector2.Distance(new Vector2(x, y), new Vector2(radius, radius)) <= radius;
+            if (x >= width - radius && y < radius)
+                return Vector2.Distance(new Vector2(x, y), new Vector2(width - radius - 1, radius)) <= radius;
+            if (x < radius && y >= height - radius)
+                return Vector2.Distance(new Vector2(x, y), new Vector2(radius, height - radius - 1)) <= radius;
+            if (x >= width - radius && y >= height - radius)
+                return Vector2.Distance(new Vector2(x, y), new Vector2(width - radius - 1, height - radius - 1)) <= radius;
+            return true;
+        }
+
+        /// <summary>
+        /// Create a soft radial glow sprite
+        /// </summary>
+        private Sprite CreateSoftGlowSprite(int size)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+
+            Vector2 center = new Vector2(size / 2f, size / 2f);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), center) / (size / 2f);
+                    float alpha = Mathf.Max(0, 1 - dist * dist); // Quadratic falloff
+                    tex.SetPixel(x, y, new Color(1, 1, 1, alpha));
+                }
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        // Keep legacy oval method for compatibility but not used
+        private void CreateOvalTable(Transform parent)
+        {
+            // Redirected to modern table design
+            CreateModernTable(parent);
         }
 
         /// <summary>
@@ -628,40 +1085,40 @@ namespace Lekha.UI
 
         private void CreateWoodTableFrame(Transform parent)
         {
-            // Create elegant wood frame around the table
+            // Create elegant modern frame around the table
             float frameThickness = 18f;
-            Color woodMain = ModernUITheme.WoodDark;
-            Color woodHighlight = ModernUITheme.WoodLight;
-            Color goldTrim = new Color(ModernUITheme.GoldAccent.r, ModernUITheme.GoldAccent.g, ModernUITheme.GoldAccent.b, 0.6f);
+            Color frameMain = new Color(0.12f, 0.10f, 0.22f, 0.95f);
+            Color frameHighlight = new Color(0.18f, 0.16f, 0.30f, 1f);
+            Color accentTrim = new Color(0.40f, 0.75f, 1f, 0.4f); // Cyan accent
 
             // Outer dark frame
             CreateFrameEdge(parent, "TopFrame", new Vector2(0, 1), new Vector2(1, 1),
-                new Vector2(0.5f, 1), new Vector2(0, frameThickness), Vector2.zero, woodMain, true);
+                new Vector2(0.5f, 1), new Vector2(0, frameThickness), Vector2.zero, frameMain, true);
 
             CreateFrameEdge(parent, "BottomFrame", new Vector2(0, 0), new Vector2(1, 0),
-                new Vector2(0.5f, 0), new Vector2(0, frameThickness), Vector2.zero, woodMain * 0.85f, false);
+                new Vector2(0.5f, 0), new Vector2(0, frameThickness), Vector2.zero, frameMain * 0.85f, false);
 
             CreateFrameEdge(parent, "LeftFrame", new Vector2(0, 0), new Vector2(0, 1),
-                new Vector2(0, 0.5f), new Vector2(frameThickness, 0), Vector2.zero, woodMain * 0.9f, false);
+                new Vector2(0, 0.5f), new Vector2(frameThickness, 0), Vector2.zero, frameMain * 0.9f, false);
 
             CreateFrameEdge(parent, "RightFrame", new Vector2(1, 0), new Vector2(1, 1),
-                new Vector2(1, 0.5f), new Vector2(frameThickness, 0), Vector2.zero, woodMain * 0.95f, false);
+                new Vector2(1, 0.5f), new Vector2(frameThickness, 0), Vector2.zero, frameMain * 0.95f, false);
 
-            // Inner gold trim line
+            // Inner cyan trim line
             float trimOffset = frameThickness - 3f;
             float trimWidth = 2f;
 
             CreateTrimLine(parent, "TopTrim", new Vector2(0, 1), new Vector2(1, 1),
-                new Vector2(0.5f, 1), new Vector2(-frameThickness * 2, trimWidth), new Vector2(0, -trimOffset), goldTrim);
+                new Vector2(0.5f, 1), new Vector2(-frameThickness * 2, trimWidth), new Vector2(0, -trimOffset), accentTrim);
 
             CreateTrimLine(parent, "BottomTrim", new Vector2(0, 0), new Vector2(1, 0),
-                new Vector2(0.5f, 0), new Vector2(-frameThickness * 2, trimWidth), new Vector2(0, trimOffset), goldTrim);
+                new Vector2(0.5f, 0), new Vector2(-frameThickness * 2, trimWidth), new Vector2(0, trimOffset), accentTrim);
 
             CreateTrimLine(parent, "LeftTrim", new Vector2(0, 0), new Vector2(0, 1),
-                new Vector2(0, 0.5f), new Vector2(trimWidth, -frameThickness * 2), new Vector2(trimOffset, 0), goldTrim);
+                new Vector2(0, 0.5f), new Vector2(trimWidth, -frameThickness * 2), new Vector2(trimOffset, 0), accentTrim);
 
             CreateTrimLine(parent, "RightTrim", new Vector2(1, 0), new Vector2(1, 1),
-                new Vector2(1, 0.5f), new Vector2(trimWidth, -frameThickness * 2), new Vector2(-trimOffset, 0), goldTrim);
+                new Vector2(1, 0.5f), new Vector2(trimWidth, -frameThickness * 2), new Vector2(-trimOffset, 0), accentTrim);
 
             // Corner decorations
             CreateCornerAccent(parent, "TopLeftCorner", new Vector2(0, 1), new Vector2(0, 1), frameThickness);
@@ -704,7 +1161,7 @@ namespace Lekha.UI
                 hRect.anchoredPosition = Vector2.zero;
 
                 Image hImg = highlightObj.AddComponent<Image>();
-                hImg.color = ModernUITheme.WoodLight * 1.2f;
+                hImg.color = new Color(0.40f, 0.75f, 1f, 0.3f); // Cyan highlight
                 hImg.raycastTarget = false;
             }
         }
@@ -737,11 +1194,11 @@ namespace Lekha.UI
             rect.sizeDelta = new Vector2(size, size);
 
             Image img = obj.AddComponent<Image>();
-            img.color = ModernUITheme.WoodDark;
+            img.color = new Color(0.12f, 0.10f, 0.22f, 0.95f); // Modern dark purple
             img.raycastTarget = false;
 
-            // Gold dot in corner
-            GameObject dotObj = new GameObject("GoldDot");
+            // Cyan dot in corner
+            GameObject dotObj = new GameObject("CyanDot");
             dotObj.transform.SetParent(obj.transform, false);
             RectTransform dotRect = dotObj.AddComponent<RectTransform>();
             dotRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -753,7 +1210,7 @@ namespace Lekha.UI
             {
                 dotImg.sprite = ModernUITheme.Instance.CircleSprite;
             }
-            dotImg.color = ModernUITheme.GoldAccent;
+            dotImg.color = new Color(0.40f, 0.75f, 1f, 0.8f); // Cyan accent
             dotImg.raycastTarget = false;
         }
 
@@ -787,14 +1244,14 @@ namespace Lekha.UI
 
         private TextMeshProUGUI CreateInstructionText(Transform parent)
         {
-            // Instruction panel - CENTERED ON TABLE
+            // Instruction panel - TOP LEFT, next to Round indicator
             GameObject bgObj = new GameObject("Instructions_BG");
             bgObj.transform.SetParent(parent, false);
             RectTransform bgRect = bgObj.AddComponent<RectTransform>();
-            bgRect.anchorMin = new Vector2(0.5f, 0.5f);
-            bgRect.anchorMax = new Vector2(0.5f, 0.5f);
-            bgRect.anchoredPosition = new Vector2(0, 120); // Above center, on table
-            bgRect.sizeDelta = new Vector2(450, 50);
+            bgRect.anchorMin = new Vector2(0f, 1f);
+            bgRect.anchorMax = new Vector2(0f, 1f);
+            bgRect.anchoredPosition = new Vector2(300, -50); // Next to Round indicator
+            bgRect.sizeDelta = new Vector2(350, 36);
 
             Image bgImg = bgObj.AddComponent<Image>();
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
@@ -802,11 +1259,7 @@ namespace Lekha.UI
                 bgImg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
                 bgImg.type = Image.Type.Sliced;
             }
-            bgImg.color = new Color(0.02f, 0.02f, 0.02f, 0.75f);
-
-            Shadow shadow = bgObj.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.5f);
-            shadow.effectDistance = new Vector2(0, -2);
+            bgImg.color = new Color(0.10f, 0.12f, 0.20f, 0.85f); // Modern dark glass
 
             GameObject textObj = new GameObject("Instructions");
             textObj.transform.SetParent(bgObj.transform, false);
@@ -817,7 +1270,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = "";
-            tmp.fontSize = 24;
+            tmp.fontSize = 18;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = ModernUITheme.TextPrimary;
@@ -827,13 +1280,13 @@ namespace Lekha.UI
 
         private TextMeshProUGUI CreateRoundText(Transform parent)
         {
-            // Round indicator - TOP LEFT CORNER
+            // Round indicator - TOP LEFT CORNER (moved in from edge)
             GameObject bgObj = new GameObject("Round_BG");
             bgObj.transform.SetParent(parent, false);
             RectTransform bgRect = bgObj.AddComponent<RectTransform>();
             bgRect.anchorMin = new Vector2(0f, 1f);
             bgRect.anchorMax = new Vector2(0f, 1f);
-            bgRect.anchoredPosition = new Vector2(80, -30);
+            bgRect.anchoredPosition = new Vector2(90, -50); // More inward to stay on screen
             bgRect.sizeDelta = new Vector2(120, 36);
 
             Image bgImg = bgObj.AddComponent<Image>();
@@ -842,7 +1295,8 @@ namespace Lekha.UI
                 bgImg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
                 bgImg.type = Image.Type.Sliced;
             }
-            bgImg.color = new Color(0.04f, 0.02f, 0.01f, 0.85f);
+            bgImg.color = new Color(0.10f, 0.12f, 0.20f, 0.90f); // Modern dark glass
+            bgImg.raycastTarget = false; // Prevent blocking emoji button clicks
 
             GameObject textObj = new GameObject("Round");
             textObj.transform.SetParent(bgObj.transform, false);
@@ -856,7 +1310,7 @@ namespace Lekha.UI
             tmp.fontSize = 16;
             tmp.fontStyle = FontStyles.Bold;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = ModernUITheme.GoldAccent;
+            tmp.color = new Color(0.40f, 0.75f, 1f, 1f); // Modern cyan accent
 
             return tmp;
         }
@@ -956,6 +1410,18 @@ namespace Lekha.UI
 
                 // Create player info panels now that GameManager is available
                 CreatePlayerInfoPanels();
+
+                // Show ping display if online
+                if (PingDisplay.Instance != null)
+                    PingDisplay.Instance.AutoDetect();
+
+                // Subscribe to disconnect UI events for online games
+                if (NetworkGameSync.Instance != null)
+                {
+                    NetworkGameSync.Instance.OnPlayerDisconnectedUI += OnPlayerDisconnectedUI;
+                    NetworkGameSync.Instance.OnPlayerReconnectedUI += OnPlayerReconnectedUI;
+                    NetworkGameSync.Instance.OnBotReplacedUI += OnBotReplacedUI;
+                }
             }
             else
             {
@@ -998,9 +1464,10 @@ namespace Lekha.UI
                         Debug.Log($"[OnPassClicked] Sent {localCards.Count} cards from {fromPos} to {toPos}");
                     }
 
+                    // Notify GameManager that local player has submitted their pass
+                    GameManager.Instance.NotifyLocalPassSubmitted();
+
                     // Hide pass button and wait for all players to pass
-                    // The actual pass completion will be triggered when all players have passed
-                    // For now, we'll optimistically continue since the server handles sync
                     selectedForPass.Clear();
                     isPassPhase = false;
                     passButton.gameObject.SetActive(false);
@@ -1008,9 +1475,6 @@ namespace Lekha.UI
                     // Refresh display (cards removed from hand)
                     DisplayPlayerHandAnimated();
                     instructionText.text = "Waiting for other players to pass...";
-
-                    // In online mode, pass phase completion is handled by network sync
-                    // The server will notify when all players have passed
                 }
                 else
                 {
@@ -1134,10 +1598,23 @@ namespace Lekha.UI
 
         private void OnCardsDealt()
         {
-            // Ensure player info panels exist
-            if (playerInfoPanels.Count == 0)
+            // Recreate player info panels to ensure correct visual positions
+            // (online game config may have been set after initial panel creation)
+            CreatePlayerInfoPanels();
+
+            // Show ping display for online games
+            if (PingDisplay.Instance != null)
             {
-                CreatePlayerInfoPanels();
+                bool isOnline = (GameManager.Instance != null && GameManager.Instance.LocalPlayerPosition.HasValue)
+                    || (NetworkGameSync.Instance != null && NetworkGameSync.Instance.IsOnlineGame);
+                if (isOnline)
+                    PingDisplay.Instance.Show();
+            }
+
+            // Clear history when starting a new game (round 1)
+            if (GameManager.Instance?.RoundNumber == 1 && scoreSummaryPopup != null)
+            {
+                scoreSummaryPopup.ClearHistory();
             }
 
             // Clear special card indicators from previous round
@@ -1272,11 +1749,18 @@ namespace Lekha.UI
             float backHeight = 65f;
             float overlap = 12f; // Heavy overlap for compact look
 
+            // Get local player to skip (works for both online and offline)
+            Player localPlayer = GameManager.Instance.GetHumanPlayer();
+
             foreach (var player in GameManager.Instance.Players)
             {
-                if (player.IsHuman) continue; // Skip human player
+                // Skip the local player (their cards are shown face-up at bottom)
+                if (player == localPlayer) continue;
 
-                RectTransform container = player.Position switch
+                // Use visual position to choose which container
+                PlayerPosition visualPos = GameManager.Instance.GetVisualPosition(player.Position);
+
+                RectTransform container = visualPos switch
                 {
                     PlayerPosition.West => leftHandContainer,
                     PlayerPosition.North => topHandContainer,
@@ -1294,7 +1778,7 @@ namespace Lekha.UI
                 int displayCount = Mathf.Min(cardCount, 13);
                 for (int i = 0; i < displayCount; i++)
                 {
-                    CreateCardBack(container, backWidth, backHeight, startX + i * overlap, player.Position);
+                    CreateCardBack(container, backWidth, backHeight, startX + i * overlap, visualPos);
                 }
             }
         }
@@ -1549,23 +2033,50 @@ namespace Lekha.UI
             // Play sound
             SoundManager.Instance?.PlayCardPlay();
 
+            // Check for special cards and play dramatic effect
+            Debug.Log($"[OnCardPlayed] Checking special cards: {card.Suit} {card.Rank}, IsQueenOfSpades={card.IsQueenOfSpades()}, SpecialCardEffect.Instance={SpecialCardEffect.Instance != null}");
+
+            // Ensure SpecialCardEffect exists (create if missing)
+            if (SpecialCardEffect.Instance == null && mainCanvas != null)
+            {
+                Debug.Log("[OnCardPlayed] SpecialCardEffect.Instance is null! Creating it now...");
+                GameObject specialEffectObj = new GameObject("SpecialCardEffect");
+                specialEffectObj.transform.SetParent(canvasTransform, false);
+                SpecialCardEffect specialEffect = specialEffectObj.AddComponent<SpecialCardEffect>();
+                specialEffect.Initialize(mainCanvas);
+                Debug.Log($"[OnCardPlayed] SpecialCardEffect created. Instance now: {SpecialCardEffect.Instance != null}");
+            }
+
+            if (card.IsQueenOfSpades())
+            {
+                // Queen of Spades (+2 points) - intense effect
+                Debug.Log("[OnCardPlayed] >>> QUEEN OF SPADES DETECTED! Playing effect...");
+                SpecialCardEffect.Instance?.PlayQueenOfSpadesEffect();
+            }
+            else if (card.Suit == Suit.Diamonds && card.Rank == Rank.Ten)
+            {
+                // 10 of Diamonds (0 points) - special effect
+                Debug.Log("[OnCardPlayed] >>> 10 OF DIAMONDS DETECTED! Playing effect...");
+                SpecialCardEffect.Instance?.PlayTenOfDiamondsEffect();
+            }
+
             // Particle effects disabled - they were causing visual flickering
 
             // Show card in trick area
             CardUI cardUI = CreateCardUI(card, trickArea);
             trickCards.Add(cardUI);
 
-            // Jawaker-style: overlapping cards in center
-            // Cards stack with slight offset based on play order
-            int cardIndex = trickCards.Count - 1; // 0-based index for this card
-            float baseOffset = 25f; // Offset per card
-            Vector2 pos = player.Position switch
+            // Spread cards around center - each player's card in distinct position
+            // Use visual position so cards come from the correct screen direction
+            PlayerPosition visualPos = GameManager.Instance.GetVisualPosition(player.Position);
+            float spreadDistance = 120f; // Distance from center for each card
+            Vector2 pos = visualPos switch
             {
-                // Stack cards with slight directional offset from player position
-                PlayerPosition.South => new Vector2(baseOffset * cardIndex * 0.3f, -30 + cardIndex * 10),
-                PlayerPosition.West => new Vector2(-40 + cardIndex * 15, baseOffset * cardIndex * 0.3f),
-                PlayerPosition.North => new Vector2(-baseOffset * cardIndex * 0.3f, 30 - cardIndex * 10),
-                PlayerPosition.East => new Vector2(40 - cardIndex * 15, -baseOffset * cardIndex * 0.3f),
+                // Each card gets its own position based on visual seat
+                PlayerPosition.South => new Vector2(0, -spreadDistance),      // Below center
+                PlayerPosition.West => new Vector2(-spreadDistance - 30, 0),  // Left of center
+                PlayerPosition.North => new Vector2(0, spreadDistance),       // Above center
+                PlayerPosition.East => new Vector2(spreadDistance + 30, 0),   // Right of center
                 _ => Vector2.zero
             };
 
@@ -1575,7 +2086,7 @@ namespace Lekha.UI
             if (CardAnimator.Instance != null)
             {
                 RectTransform cardRect = cardUI.GetComponent<RectTransform>();
-                Vector2 startPos = GetPlayerStartPosition(player.Position);
+                Vector2 startPos = GetPlayerStartPosition(visualPos);
                 cardRect.anchoredPosition = startPos;
                 CardAnimator.Instance.AnimatePlay(cardRect, pos, () => OnCardPlayAnimationComplete(player));
             }
@@ -1625,6 +2136,12 @@ namespace Lekha.UI
                     Debug.Log($"[OnCardPlayAnimationComplete] Scheduling AI play for {GameManager.Instance.CurrentPlayer.PlayerName} in {delay:F2}s");
                     ScheduleAIPlay(delay);
                 }
+                else if (GameManager.Instance.ShouldHostPlayForPosition(GameManager.Instance.CurrentPlayer.Position))
+                {
+                    // Online game - host plays AI for disconnected/bot player
+                    Debug.Log($"[OnCardPlayAnimationComplete] HOST scheduling AI for disconnected {GameManager.Instance.CurrentPlayer.PlayerName} in {delay:F2}s");
+                    ScheduleAIPlay(delay);
+                }
                 else
                 {
                     // Online game - waiting for remote player
@@ -1647,9 +2164,22 @@ namespace Lekha.UI
         }
 
         /// <summary>
+        /// Trigger AI play for a disconnected/bot player. Called by NetworkGameSync.
+        /// </summary>
+        public void TriggerDisconnectedPlayerAI()
+        {
+            if (GameManager.Instance.CurrentState == GameState.PlayingTricks)
+            {
+                float delay = GetRemainingCooldown() + 0.3f;
+                if (delay < 0.5f) delay = 0.5f;
+                ScheduleAIPlay(delay);
+            }
+        }
+
+        /// <summary>
         /// Cancel any pending AI play coroutine
         /// </summary>
-        private void CancelPendingAIPlay()
+        public void CancelPendingAIPlay()
         {
             if (pendingAIPlayCoroutine != null)
             {
@@ -1707,11 +2237,16 @@ namespace Lekha.UI
         {
             Debug.Log($"[AIPlayCard] Called. State: {GameManager.Instance.CurrentState}, CanPlay: {CanPlayNow()}, Cooldown: {GetRemainingCooldown():F2}s, IsOnline: {GameManager.Instance.IsOnlineGame}");
 
-            // In online games, AI should NEVER play - remote players play their own cards
+            // In online games, AI only plays for disconnected/bot-replaced players (host only)
             if (GameManager.Instance.IsOnlineGame)
             {
-                Debug.Log("[AIPlayCard] Online game - AI disabled, waiting for remote player");
-                return;
+                PlayerPosition currentPos = GameManager.Instance.CurrentPlayer.Position;
+                if (!GameManager.Instance.ShouldHostPlayForPosition(currentPos))
+                {
+                    Debug.Log($"[AIPlayCard] Online game - waiting for remote player at {currentPos}");
+                    return;
+                }
+                Debug.Log($"[AIPlayCard] Online game - HOST playing AI for disconnected/bot at {currentPos}");
             }
 
             // NUCLEAR LOCK: Don't play if cooldown hasn't expired
@@ -1734,8 +2269,16 @@ namespace Lekha.UI
 
             if (currentPlayer.IsHuman)
             {
-                Debug.Log("[AIPlayCard] Current player is human, aborting");
-                return;
+                // In online games, host can play for disconnected players still marked human
+                if (GameManager.Instance.IsOnlineGame && GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
+                {
+                    Debug.Log($"[AIPlayCard] Playing AI for disconnected human player {currentPlayer.PlayerName}");
+                }
+                else
+                {
+                    Debug.Log("[AIPlayCard] Current player is human, aborting");
+                    return;
+                }
             }
 
             // Check if AI has any cards left
@@ -1833,7 +2376,7 @@ namespace Lekha.UI
                     }
                 }
 
-                Vector2 collectPos = GetPlayerStartPosition(winner.Position);
+                Vector2 collectPos = GetPlayerStartPosition(GameManager.Instance.GetVisualPosition(winner.Position));
                 CardAnimator.Instance.AnimateCollect(cardRects, collectPos, () => {
                     ClearTrickAreaImmediate();
                     ContinueAfterTrick();
@@ -1946,6 +2489,10 @@ namespace Lekha.UI
                 instructionText.text = "Select 3 cards to pass right";
                 // Highlight which cards can be passed (respecting the "cannot empty color" rule)
                 UpdatePassableCards();
+
+                // HOST: auto-pass for disconnected/bot players
+                if (NetworkGameSync.Instance != null)
+                    NetworkGameSync.Instance.AutoPassForDisconnectedPlayers();
             }
             else if (state == GameState.PlayingTricks)
             {
@@ -2029,6 +2576,12 @@ namespace Lekha.UI
                 Debug.Log($"[StartTurnAfterDelay] AI {currentPlayer.PlayerName}'s turn - playing now");
                 AIPlayCard();
             }
+            else if (GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
+            {
+                // Online game - host plays AI for disconnected/bot player
+                Debug.Log($"[StartTurnAfterDelay] HOST playing AI for disconnected {currentPlayer.PlayerName}");
+                AIPlayCard();
+            }
             else
             {
                 // Online game - waiting for remote player
@@ -2078,6 +2631,25 @@ namespace Lekha.UI
             SoundManager.Instance?.PlayRoundEnd();
             UpdateScoreText();
             instructionText.text = "Round ended! Starting next round...";
+
+            // Record round scores to history
+            if (scoreSummaryPopup != null && GameManager.Instance != null)
+            {
+                int roundNum = GameManager.Instance.RoundNumber;
+                int southScore = 0, eastScore = 0, northScore = 0, westScore = 0;
+                foreach (var p in players)
+                {
+                    switch (p.Position)
+                    {
+                        case PlayerPosition.South: southScore = p.RoundPoints; break;
+                        case PlayerPosition.East: eastScore = p.RoundPoints; break;
+                        case PlayerPosition.North: northScore = p.RoundPoints; break;
+                        case PlayerPosition.West: westScore = p.RoundPoints; break;
+                    }
+                }
+                scoreSummaryPopup.RecordRoundHistory(roundNum, southScore, eastScore, northScore, westScore);
+            }
+
             StartCoroutine(DelayedStartNextRound(2f));
         }
 
@@ -2272,6 +2844,56 @@ namespace Lekha.UI
             {
                 Destroy(container.GetChild(i).gameObject);
             }
+        }
+
+        /// <summary>
+        /// Show an emoji reaction above the specified player's panel
+        /// </summary>
+        public void ShowEmojiForPlayer(string emoji, PlayerPosition position)
+        {
+            if (playerInfoPanels.TryGetValue(position, out PlayerInfoPanel panel))
+            {
+                panel.ShowEmoji(emoji);
+            }
+        }
+
+        // --- Disconnect UI event handlers ---
+
+        private void OnPlayerDisconnectedUI(PlayerPosition pos, string playerName, float timeoutSeconds)
+        {
+            // Update player info panel
+            if (playerInfoPanels.TryGetValue(pos, out PlayerInfoPanel panel))
+            {
+                panel.SetDisconnected(true);
+            }
+
+            // Show notification banner
+            DisconnectNotification.Instance?.ShowDisconnected(pos, playerName, timeoutSeconds);
+        }
+
+        private void OnPlayerReconnectedUI(PlayerPosition pos, string playerName)
+        {
+            // Update player info panel
+            if (playerInfoPanels.TryGetValue(pos, out PlayerInfoPanel panel))
+            {
+                panel.SetDisconnected(false);
+            }
+
+            // Show reconnected notification
+            DisconnectNotification.Instance?.ShowReconnected(pos, playerName);
+        }
+
+        private void OnBotReplacedUI(PlayerPosition pos, string playerName)
+        {
+            // Update player info panel
+            if (playerInfoPanels.TryGetValue(pos, out PlayerInfoPanel panel))
+            {
+                panel.SetDisconnected(false);
+                panel.SetBotReplaced(true);
+            }
+
+            // Show bot replaced notification
+            DisconnectNotification.Instance?.ShowBotReplaced(pos, playerName);
         }
     }
 }

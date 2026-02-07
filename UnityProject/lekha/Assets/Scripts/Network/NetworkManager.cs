@@ -61,11 +61,7 @@ namespace Lekha.Network
         RoundEnd,
         GameOver,
         GameState,
-
-        // Voice
-        VoiceData,
-        MutePlayer,
-        UnmutePlayer,
+        BotReplaced,
 
         // Spectator
         SpectateRoom,
@@ -162,6 +158,17 @@ namespace Lekha.Network
     }
 
     /// <summary>
+    /// Data for bot replacement event
+    /// </summary>
+    [Serializable]
+    public class BotReplacedData
+    {
+        public string PlayerId;
+        public string Name;
+        public string Position;
+    }
+
+    /// <summary>
     /// Represents a game room
     /// </summary>
     [Serializable]
@@ -215,7 +222,7 @@ namespace Lekha.Network
 
         // Server configuration
         [Header("Server Settings")]
-        [SerializeField] private string serverUrl = "wss://lekha-l5kt.onrender.com";
+        [SerializeField] private string serverUrl = "ws://95.179.255.32:8080";
         [SerializeField] private bool useLocalServer = false;
         [SerializeField] private string localServerUrl = "ws://localhost:8080";
 
@@ -225,6 +232,11 @@ namespace Lekha.Network
         public NetworkPlayer LocalPlayer { get; private set; }
         public GameRoom CurrentRoom { get; private set; }
         public bool IsSpectating { get; private set; }
+
+        // Ping tracking
+        public int PingMs { get; private set; } = 0;
+        private float pingSentTime = 0f;
+        private Coroutine pingCoroutine;
 
         // Events
         public event Action<ConnectionState> OnConnectionStateChanged;
@@ -236,6 +248,7 @@ namespace Lekha.Network
         public event Action<NetworkPlayer> OnPlayerLeft;
         public event Action<PlayerDisconnectInfo> OnPlayerDisconnected;  // Player temporarily disconnected
         public event Action<NetworkPlayer> OnPlayerReconnected;  // Player reconnected
+        public event Action<BotReplacedData> OnBotReplaced;  // Player replaced by bot after timeout
         public event Action<string, string, string> OnPositionSelected;  // playerId, newPosition, oldPosition
         public event Action<string> OnGameStarted;
         public event Action<NetworkMessage> OnMessageReceived;
@@ -462,6 +475,10 @@ namespace Lekha.Network
                 // Start receiving messages
                 StartCoroutine(ReceiveMessages());
 
+                // Start ping measurement
+                if (pingCoroutine != null) StopCoroutine(pingCoroutine);
+                pingCoroutine = StartCoroutine(PingCoroutine());
+
                 // Send profile info
                 SendProfileInfo();
             }
@@ -672,7 +689,11 @@ namespace Lekha.Network
                     break;
 
                 case NetworkMessageType.Pong:
-                    // Heartbeat response
+                    // Calculate round-trip latency
+                    if (pingSentTime > 0f)
+                    {
+                        PingMs = Mathf.RoundToInt((Time.realtimeSinceStartup - pingSentTime) * 1000f);
+                    }
                     break;
 
                 case NetworkMessageType.Error:
@@ -709,6 +730,10 @@ namespace Lekha.Network
 
                 case NetworkMessageType.PlayerReconnected:
                     HandlePlayerReconnected(message);
+                    break;
+
+                case NetworkMessageType.BotReplaced:
+                    HandleBotReplaced(message);
                     break;
 
                 case NetworkMessageType.PositionSelected:
@@ -901,6 +926,20 @@ namespace Lekha.Network
             catch (Exception ex)
             {
                 Debug.LogError($"[NetworkManager] Failed to parse player reconnected: {ex.Message}");
+            }
+        }
+
+        private void HandleBotReplaced(NetworkMessage message)
+        {
+            try
+            {
+                var data = JsonUtility.FromJson<BotReplacedData>(message.Data);
+                Debug.Log($"[NetworkManager] Player replaced by bot: {data.Name} at {data.Position}");
+                OnBotReplaced?.Invoke(data);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManager] Failed to parse bot replaced: {ex.Message}");
             }
         }
 
@@ -1187,19 +1226,6 @@ namespace Lekha.Network
             SendMessage(message);
         }
 
-        /// <summary>
-        /// Send voice data
-        /// </summary>
-        public void SendVoiceData(byte[] audioData)
-        {
-            if (State != ConnectionState.InGame && State != ConnectionState.InLobby)
-                return;
-
-            var message = new NetworkMessage(NetworkMessageType.VoiceData, Convert.ToBase64String(audioData));
-            message.SenderId = LocalPlayerId;
-            SendMessage(message);
-        }
-
         private void SendMessage(NetworkMessage message)
         {
             if (webSocket == null || webSocket.State != WebSocketState.Open)
@@ -1238,6 +1264,20 @@ namespace Lekha.Network
 
             State = newState;
             OnConnectionStateChanged?.Invoke(newState);
+        }
+
+        private IEnumerator PingCoroutine()
+        {
+            while (State != ConnectionState.Disconnected)
+            {
+                yield return new WaitForSeconds(3f);
+                if (webSocket != null && webSocket.State == WebSocketState.Open)
+                {
+                    pingSentTime = Time.realtimeSinceStartup;
+                    SendMessage(new NetworkMessage { Type = NetworkMessageType.Ping.ToString() });
+                }
+            }
+            PingMs = 0;
         }
 
         private void OnApplicationPause(bool pauseStatus)

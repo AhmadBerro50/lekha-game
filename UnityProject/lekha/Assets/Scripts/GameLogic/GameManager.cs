@@ -63,6 +63,10 @@ namespace Lekha.GameLogic
         private bool isOnlineGame = false;
         private PlayerPosition? localPlayerPosition = null;
 
+        // Disconnect tracking for online games
+        private HashSet<PlayerPosition> disconnectedPositions = new HashSet<PlayerPosition>();
+        private HashSet<PlayerPosition> botReplacedPositions = new HashSet<PlayerPosition>();
+
         // Points needed to lose
         private const int LOSING_SCORE = 101;
 
@@ -177,40 +181,76 @@ namespace Lekha.GameLogic
             }
         }
 
-        // Track received pass cards for online games
+        // Track pass phase state for online games
         private HashSet<string> receivedPassFrom = new HashSet<string>();
+        private bool localPassSubmitted = false;
+        private Network.PassCardsData bufferedPassCards = null;
+
+        /// <summary>
+        /// Called by GameUI when the local player submits their pass cards.
+        /// This ensures we don't complete the pass phase until both:
+        /// 1. Local player has submitted their pass
+        /// 2. We've received pass cards from the server
+        /// </summary>
+        public void NotifyLocalPassSubmitted()
+        {
+            localPassSubmitted = true;
+            Debug.Log("[GameManager] Local player submitted pass cards");
+
+            // If we already received remote pass cards while waiting, apply them now
+            if (bufferedPassCards != null)
+            {
+                Debug.Log("[GameManager] Applying buffered pass cards");
+                ApplyReceivedPassCards(bufferedPassCards);
+                bufferedPassCards = null;
+            }
+        }
 
         /// <summary>
         /// Handle pass cards from remote player
         /// </summary>
         private void HandleRemotePassCards(Network.PassCardsData passData)
         {
-            // This is handled by the recipient - cards are added to their hand
             Debug.Log($"[GameManager] Received pass cards from {passData.FromPosition} to {passData.ToPosition}");
 
             if (System.Enum.TryParse<PlayerPosition>(passData.ToPosition, out PlayerPosition toPos))
             {
-                // Check if this is for the local player
                 if (isOnlineGame && localPlayerPosition.HasValue && toPos == localPlayerPosition.Value)
                 {
-                    Player recipient = GetPlayerAtPosition(toPos);
-                    List<Card> cards = new List<Card>();
-                    foreach (var cardData in passData.Cards)
+                    // If local player hasn't submitted their pass yet, buffer the received cards
+                    if (!localPassSubmitted)
                     {
-                        cards.Add(cardData.ToCard());
+                        Debug.Log("[GameManager] Buffering pass cards - local player hasn't passed yet");
+                        bufferedPassCards = passData;
+                        return;
                     }
-                    recipient.AddPassedCards(cards);
 
-                    // Track that we received pass cards from this position
-                    receivedPassFrom.Add(passData.FromPosition);
-                    Debug.Log($"[GameManager] Local player received cards from {passData.FromPosition}. Total received: {receivedPassFrom.Count}");
+                    ApplyReceivedPassCards(passData);
+                }
+            }
+        }
 
-                    // In online games, we receive from one player (the one to our left)
-                    // When we receive our cards, we can proceed to play
-                    if (currentState == GameState.PassingCards)
-                    {
-                        CompleteOnlinePassPhase();
-                    }
+        /// <summary>
+        /// Apply received pass cards to local player's hand and complete pass phase
+        /// </summary>
+        private void ApplyReceivedPassCards(Network.PassCardsData passData)
+        {
+            if (System.Enum.TryParse<PlayerPosition>(passData.ToPosition, out PlayerPosition toPos))
+            {
+                Player recipient = GetPlayerAtPosition(toPos);
+                List<Card> cards = new List<Card>();
+                foreach (var cardData in passData.Cards)
+                {
+                    cards.Add(cardData.ToCard());
+                }
+                recipient.AddPassedCards(cards);
+
+                receivedPassFrom.Add(passData.FromPosition);
+                Debug.Log($"[GameManager] Local player received {cards.Count} cards from {passData.FromPosition}");
+
+                if (currentState == GameState.PassingCards)
+                {
+                    CompleteOnlinePassPhase();
                 }
             }
         }
@@ -222,6 +262,8 @@ namespace Lekha.GameLogic
         {
             Debug.Log("[GameManager] Online pass phase complete");
             receivedPassFrom.Clear();
+            localPassSubmitted = false;
+            bufferedPassCards = null;
 
             OnPassPhaseComplete?.Invoke();
             StartTrickPhase();
@@ -320,6 +362,11 @@ namespace Lekha.GameLogic
         /// </summary>
         public void NotifyCardsDealt()
         {
+            // Reset pass state for new round
+            localPassSubmitted = false;
+            bufferedPassCards = null;
+            receivedPassFrom.Clear();
+
             OnCardsDealt?.Invoke();
             SetState(GameState.PassingCards);
         }
@@ -743,6 +790,48 @@ namespace Lekha.GameLogic
         public PlayerPosition? LocalPlayerPosition => localPlayerPosition;
 
         /// <summary>
+        /// Convert a server-assigned position to the visual screen position
+        /// relative to the local player. In online games, the local player
+        /// always appears at South (bottom), partner at North (top).
+        /// In offline games, returns the position unchanged.
+        /// </summary>
+        public PlayerPosition GetVisualPosition(PlayerPosition serverPos)
+        {
+            if (!isOnlineGame || !localPlayerPosition.HasValue)
+                return serverPos;
+
+            // Clockwise order: South(0), East(1), North(2), West(3)
+            int serverIndex = PositionToIndex(serverPos);
+            int localIndex = PositionToIndex(localPlayerPosition.Value);
+            int visualIndex = (serverIndex - localIndex + 4) % 4;
+            return IndexToPosition(visualIndex);
+        }
+
+        private static int PositionToIndex(PlayerPosition pos)
+        {
+            return pos switch
+            {
+                PlayerPosition.South => 0,
+                PlayerPosition.East => 1,
+                PlayerPosition.North => 2,
+                PlayerPosition.West => 3,
+                _ => 0
+            };
+        }
+
+        private static PlayerPosition IndexToPosition(int index)
+        {
+            return (index % 4) switch
+            {
+                0 => PlayerPosition.South,
+                1 => PlayerPosition.East,
+                2 => PlayerPosition.North,
+                3 => PlayerPosition.West,
+                _ => PlayerPosition.South
+            };
+        }
+
+        /// <summary>
         /// Configure for online multiplayer game
         /// </summary>
         public void ConfigureForOnlineGame(PlayerPosition localPosition)
@@ -777,12 +866,52 @@ namespace Lekha.GameLogic
         {
             isOnlineGame = false;
             localPlayerPosition = null;
+            disconnectedPositions.Clear();
+            botReplacedPositions.Clear();
             // Restore default human state
             foreach (var player in players)
             {
                 player.SetIsHuman(player.Position == PlayerPosition.South);
             }
         }
+
+        // --- Disconnect tracking for online games ---
+
+        public void MarkPlayerDisconnected(PlayerPosition pos)
+        {
+            disconnectedPositions.Add(pos);
+            Debug.Log($"[GameManager] Player at {pos} marked as disconnected");
+        }
+
+        public void MarkPlayerReconnected(PlayerPosition pos)
+        {
+            disconnectedPositions.Remove(pos);
+            Debug.Log($"[GameManager] Player at {pos} reconnected");
+        }
+
+        public void ReplacePlayerWithBot(PlayerPosition pos)
+        {
+            disconnectedPositions.Remove(pos);
+            botReplacedPositions.Add(pos);
+            Player player = GetPlayerAtPosition(pos);
+            if (player != null) player.SetIsHuman(false);
+            Debug.Log($"[GameManager] Player at {pos} replaced by bot");
+        }
+
+        public bool IsPlayerDisconnectedOrBot(PlayerPosition pos)
+        {
+            return disconnectedPositions.Contains(pos) || botReplacedPositions.Contains(pos);
+        }
+
+        public bool ShouldHostPlayForPosition(PlayerPosition pos)
+        {
+            if (!isOnlineGame) return false;
+            if (NetworkGameSync.Instance == null || !NetworkGameSync.Instance.IsHost) return false;
+            return IsPlayerDisconnectedOrBot(pos);
+        }
+
+        public IReadOnlyCollection<PlayerPosition> DisconnectedPositions => disconnectedPositions;
+        public IReadOnlyCollection<PlayerPosition> BotReplacedPositions => botReplacedPositions;
 
         /// <summary>
         /// Set player names from network player data for online games

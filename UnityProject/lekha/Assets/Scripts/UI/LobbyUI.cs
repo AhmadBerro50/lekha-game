@@ -47,23 +47,25 @@ namespace Lekha.UI
         private Button startButton;
         private TextMeshProUGUI readyButtonText;
 
-        // Modern Color Palette
-        private static readonly Color BgDark = new Color(0.08f, 0.09f, 0.11f);
-        private static readonly Color CardBg = new Color(0.12f, 0.13f, 0.16f);
-        private static readonly Color CardBgHover = new Color(0.16f, 0.17f, 0.20f);
-        private static readonly Color AccentGold = new Color(0.91f, 0.72f, 0.25f);
-        private static readonly Color AccentGreen = new Color(0.30f, 0.78f, 0.47f);
-        private static readonly Color AccentRed = new Color(0.90f, 0.35f, 0.35f);
-        private static readonly Color AccentBlue = new Color(0.35f, 0.55f, 0.95f);
-        private static readonly Color TextPrimary = new Color(0.95f, 0.95f, 0.97f);
-        private static readonly Color TextSecondary = new Color(0.60f, 0.62f, 0.68f);
-        private static readonly Color TextMuted = new Color(0.40f, 0.42f, 0.48f);
-        private static readonly Color InputBg = new Color(0.06f, 0.07f, 0.09f);
-        private static readonly Color BorderColor = new Color(0.20f, 0.22f, 0.26f);
+        // Modern 2026 Glassmorphism Color Palette
+        private static readonly Color BgDark = new Color(0.06f, 0.08f, 0.14f);
+        private static readonly Color CardBg = new Color(0.12f, 0.14f, 0.22f, 0.92f);
+        private static readonly Color CardBgHover = new Color(0.16f, 0.18f, 0.28f, 0.95f);
+        private static readonly Color AccentCyan = new Color(0.40f, 0.75f, 1f, 1f);
+        private static readonly Color AccentMagenta = new Color(0.85f, 0.45f, 0.95f, 1f);
+        private static readonly Color AccentGreen = new Color(0.45f, 0.95f, 0.70f, 1f);
+        private static readonly Color AccentRed = new Color(0.95f, 0.35f, 0.45f, 1f);
+        private static readonly Color TextPrimary = new Color(1f, 1f, 1f, 1f);
+        private static readonly Color TextSecondary = new Color(0.72f, 0.75f, 0.82f, 1f);
+        private static readonly Color TextMuted = new Color(0.50f, 0.52f, 0.60f, 1f);
+        private static readonly Color InputBg = new Color(0.08f, 0.10f, 0.16f, 0.95f);
+        private static readonly Color BorderColor = new Color(1f, 1f, 1f, 0.15f);
+        private static readonly Color GlassBorder = new Color(1f, 1f, 1f, 0.18f);
 
         // Generated textures
         private Sprite roundedSprite;
         private Sprite circleSprite;
+        private Sprite gradientSprite;
 
         public event System.Action OnBackClicked;
         public event System.Action OnGameStarting;
@@ -117,6 +119,28 @@ namespace Lekha.UI
             // Generate rounded rectangle sprite
             roundedSprite = CreateRoundedSprite(64, 64, 16);
             circleSprite = CreateCircleSprite(64);
+            gradientSprite = CreateVerticalGradientSprite(32);
+        }
+
+        private Sprite CreateVerticalGradientSprite(int height)
+        {
+            Texture2D tex = new Texture2D(1, height, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            // Modern gradient from deep navy to purple
+            Color topColor = new Color(0.12f, 0.08f, 0.22f, 1f);
+            Color bottomColor = new Color(0.06f, 0.08f, 0.14f, 1f);
+
+            for (int y = 0; y < height; y++)
+            {
+                float t = (float)y / (height - 1);
+                Color c = Color.Lerp(bottomColor, topColor, t);
+                tex.SetPixel(0, y, c);
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, 1, height), new Vector2(0.5f, 0.5f));
         }
 
         private Sprite CreateRoundedSprite(int width, int height, int radius)
@@ -238,7 +262,7 @@ namespace Lekha.UI
 
             rootPanel.AddComponent<GraphicRaycaster>();
 
-            // Background
+            // Background with gradient
             GameObject bg = new GameObject("Background");
             bg.transform.SetParent(rootPanel.transform, false);
             RectTransform bgRect = bg.AddComponent<RectTransform>();
@@ -247,7 +271,8 @@ namespace Lekha.UI
             bgRect.offsetMin = Vector2.zero;
             bgRect.offsetMax = Vector2.zero;
             Image bgImage = bg.AddComponent<Image>();
-            bgImage.color = BgDark;
+            bgImage.sprite = gradientSprite;
+            bgImage.color = Color.white;
 
             Debug.Log("[LobbyUI] Creating panels...");
             CreateConnectingPanel(bg.transform);
@@ -273,7 +298,7 @@ namespace Lekha.UI
             spinnerRect.sizeDelta = new Vector2(60, 60);
             Image spinnerImg = spinner.AddComponent<Image>();
             spinnerImg.sprite = circleSprite;
-            spinnerImg.color = AccentGold;
+            spinnerImg.color = AccentCyan;
 
             // Text
             CreateLabel(container.transform, "Text", "Connecting...", 28, TextPrimary, new Vector2(0, -40));
@@ -317,7 +342,7 @@ namespace Lekha.UI
             headerLayout.flexibleWidth = 1;
 
             // Title
-            CreateLabel(header.transform, "Title", "ONLINE LOBBY", 48, AccentGold, new Vector2(0, 30), FontStyles.Bold);
+            CreateLabel(header.transform, "Title", "ONLINE LOBBY", 48, AccentCyan, new Vector2(0, 30), FontStyles.Bold);
 
             // Player info bar
             GameObject infoBar = CreateCard(header.transform, "InfoBar", new Vector2(0, -50), new Vector2(980, 60));
@@ -334,7 +359,7 @@ namespace Lekha.UI
             avatarRect.sizeDelta = new Vector2(40, 40);
             Image avatarImg = avatar.AddComponent<Image>();
             avatarImg.sprite = circleSprite;
-            avatarImg.color = AccentGold;
+            avatarImg.color = AccentCyan;
 
             CreateLabel(avatar.transform, "Initial", playerName.Length > 0 ? playerName[0].ToString().ToUpper() : "?",
                 20, BgDark, Vector2.zero, FontStyles.Bold);
@@ -433,7 +458,7 @@ namespace Lekha.UI
             titleText.alignment = TextAlignmentOptions.Left;
 
             // Refresh button - anchored to right
-            Button refreshBtn = CreateModernButton(roomsHeader.transform, "RefreshBtn", "Refresh", AccentBlue, new Vector2(-15, 0), new Vector2(100, 36), OnRefreshClicked);
+            Button refreshBtn = CreateModernButton(roomsHeader.transform, "RefreshBtn", "Refresh", AccentMagenta, new Vector2(-15, 0), new Vector2(100, 36), OnRefreshClicked);
             RectTransform refreshRect = refreshBtn.GetComponent<RectTransform>();
             refreshRect.anchorMin = new Vector2(1, 0.5f);
             refreshRect.anchorMax = new Vector2(1, 0.5f);
@@ -451,7 +476,7 @@ namespace Lekha.UI
             TextMeshProUGUI loadingText = loadingIndicator.AddComponent<TextMeshProUGUI>();
             loadingText.text = "...";
             loadingText.fontSize = 20;
-            loadingText.color = AccentGold;
+            loadingText.color = AccentCyan;
             loadingText.alignment = TextAlignmentOptions.Center;
             loadingIndicator.SetActive(false);
 
@@ -679,7 +704,7 @@ namespace Lekha.UI
             bg.color = CardBg;
 
             // Room name (large, centered)
-            roomNameText = CreateLabel(header.transform, "RoomName", "Room Name", 32, AccentGold, new Vector2(0, 12), FontStyles.Bold);
+            roomNameText = CreateLabel(header.transform, "RoomName", "Room Name", 32, AccentCyan, new Vector2(0, 12), FontStyles.Bold);
 
             // Room code below
             roomCodeText = CreateLabel(header.transform, "RoomCode", "Public Room", 18, TextSecondary, new Vector2(0, -20));
@@ -1044,18 +1069,10 @@ namespace Lekha.UI
             readyButtonText.fontSize = 24;
 
             // Start button (host only) - top row at y=100
-            startButton = CreateModernButton(actionsBar.transform, "StartBtn", "Start Game", AccentBlue, new Vector2(170, 100), new Vector2(280, 60), OnStartClicked);
+            startButton = CreateModernButton(actionsBar.transform, "StartBtn", "Start Game", AccentMagenta, new Vector2(170, 100), new Vector2(280, 60), OnStartClicked);
             startButton.GetComponentInChildren<TextMeshProUGUI>().fontSize = 24;
 
-            // Voice chat controls (bottom row - inside the bar at y=35)
-            // Only show if voice chat is enabled
-            if (!Lekha.Network.VoiceChatManager.VOICE_CHAT_DISABLED)
-            {
-                CreateLabel(actionsBar.transform, "VoiceLabel", "Voice Chat", 16, TextSecondary, new Vector2(-280, 35));
-
-                CreateModernButton(actionsBar.transform, "MicBtn", "🎤 Mic On", CardBgHover, new Vector2(-90, 35), new Vector2(130, 40), OnMicToggleClicked);
-                CreateModernButton(actionsBar.transform, "SpeakerBtn", "🔊 Sound On", CardBgHover, new Vector2(55, 35), new Vector2(150, 40), OnSpeakerToggleClicked);
-            }
+            // Voice chat controls handled by InGameVoiceChatUI during gameplay
         }
 
         // Helper methods
@@ -1497,10 +1514,10 @@ namespace Lekha.UI
             }
             liveGameItems.Clear();
 
-            // Toggle empty message
-            if (liveGamesContent?.parent?.parent != null)
+            // Toggle empty message - EmptyMessage is a child of livePanel (3 levels up from Content)
+            if (liveGamesContent?.parent?.parent?.parent != null)
             {
-                Transform emptyMsg = liveGamesContent.parent.parent.Find("EmptyMessage");
+                Transform emptyMsg = liveGamesContent.parent.parent.parent.Find("EmptyMessage");
                 if (emptyMsg != null) emptyMsg.gameObject.SetActive(games.Count == 0);
             }
 
@@ -1548,7 +1565,7 @@ namespace Lekha.UI
             nameRect.anchorMax = new Vector2(0, 0.5f);
 
             // Watch text on right
-            TextMeshProUGUI watchLabel = CreateLabel(item.transform, "Watch", "Watch →", 14, AccentBlue, new Vector2(-15, 0), FontStyles.Normal, TextAlignmentOptions.Right);
+            TextMeshProUGUI watchLabel = CreateLabel(item.transform, "Watch", "Watch →", 14, AccentMagenta, new Vector2(-15, 0), FontStyles.Normal, TextAlignmentOptions.Right);
             RectTransform watchRect = watchLabel.GetComponent<RectTransform>();
             watchRect.anchorMin = new Vector2(1, 0.5f);
             watchRect.anchorMax = new Vector2(1, 0.5f);
@@ -1648,7 +1665,7 @@ namespace Lekha.UI
                 {
                     if (hasPlayer)
                     {
-                        posIndImg.color = player.IsReady ? AccentGreen : AccentGold;
+                        posIndImg.color = player.IsReady ? AccentGreen : AccentCyan;
                     }
                     // Empty slots keep their team color (set during creation)
                 }
@@ -1662,7 +1679,7 @@ namespace Lekha.UI
                 {
                     if (hasPlayer)
                     {
-                        avatarRing.color = player.IsReady ? AccentGreen : AccentGold;
+                        avatarRing.color = player.IsReady ? AccentGreen : AccentCyan;
                     }
                     // Empty slots keep their team color (set during creation)
                 }
@@ -1676,7 +1693,7 @@ namespace Lekha.UI
                 {
                     if (hasPlayer)
                     {
-                        avatarInnerBg.color = player.IsReady ? AccentGreen : AccentGold;
+                        avatarInnerBg.color = player.IsReady ? AccentGreen : AccentCyan;
                     }
                     else
                     {
@@ -1718,7 +1735,7 @@ namespace Lekha.UI
                         if (isLocalPlayer) displayName += " (You)";
                         if (player.IsHost) displayName = "[HOST] " + displayName;
                         nameText.text = displayName;
-                        nameText.color = isLocalPlayer ? AccentGold : TextPrimary;
+                        nameText.color = isLocalPlayer ? AccentCyan : TextPrimary;
                         nameText.fontStyle = isLocalPlayer ? FontStyles.Bold : FontStyles.Normal;
                     }
                     else
@@ -1821,7 +1838,7 @@ namespace Lekha.UI
                 startButton.interactable = canStart;
 
                 var img = startButton.GetComponent<Image>();
-                Color startColor = canStart ? AccentGold : TextMuted;
+                Color startColor = canStart ? AccentCyan : TextMuted;
                 if (img != null) img.color = startColor;
 
                 ColorBlock colors = startButton.colors;
@@ -1830,49 +1847,8 @@ namespace Lekha.UI
                 startButton.colors = colors;
             }
 
-            // Update voice buttons
-            UpdateVoiceButtonsState();
         }
 
-        private void UpdateVoiceButtonsState()
-        {
-            Transform actionsBar = roomPanel?.transform.Find("Container/ActionsBar");
-            if (actionsBar == null) return;
-
-            Transform micBtn = actionsBar.Find("MicBtn");
-            if (micBtn != null)
-            {
-                var text = micBtn.GetComponentInChildren<TextMeshProUGUI>();
-                if (text != null)
-                {
-                    bool muted = VoiceChatManager.Instance?.IsMicrophoneMuted ?? false;
-                    text.text = muted ? "🎤 Mic Off" : "🎤 Mic On";
-                }
-                var img = micBtn.GetComponent<Image>();
-                if (img != null)
-                {
-                    bool muted = VoiceChatManager.Instance?.IsMicrophoneMuted ?? false;
-                    img.color = muted ? AccentRed : CardBgHover;
-                }
-            }
-
-            Transform speakerBtn = actionsBar.Find("SpeakerBtn");
-            if (speakerBtn != null)
-            {
-                var text = speakerBtn.GetComponentInChildren<TextMeshProUGUI>();
-                if (text != null)
-                {
-                    bool muted = VoiceChatManager.Instance?.IsSpeakerMuted ?? false;
-                    text.text = muted ? "🔇 Sound Off" : "🔊 Sound On";
-                }
-                var img = speakerBtn.GetComponent<Image>();
-                if (img != null)
-                {
-                    bool muted = VoiceChatManager.Instance?.IsSpeakerMuted ?? false;
-                    img.color = muted ? AccentRed : CardBgHover;
-                }
-            }
-        }
 
         private void OnPlayerJoined(NetworkPlayer player)
         {
@@ -1972,42 +1948,6 @@ namespace Lekha.UI
             OnRefreshClicked();
         }
 
-        private void OnMicToggleClicked()
-        {
-            Debug.Log("[LobbyUI] Mic button clicked!");
-            if (VoiceChatManager.Instance != null)
-            {
-                bool muted = VoiceChatManager.Instance.IsMicrophoneMuted;
-                VoiceChatManager.Instance.SetMicrophoneMuted(!muted);
-                Debug.Log($"[LobbyUI] Mic muted: {!muted}");
-                UpdateVoiceButtons();
-            }
-            else
-            {
-                Debug.LogWarning("[LobbyUI] VoiceChatManager.Instance is null!");
-            }
-        }
-
-        private void OnSpeakerToggleClicked()
-        {
-            Debug.Log("[LobbyUI] Speaker button clicked!");
-            if (VoiceChatManager.Instance != null)
-            {
-                bool muted = VoiceChatManager.Instance.IsSpeakerMuted;
-                VoiceChatManager.Instance.SetSpeakerMuted(!muted);
-                Debug.Log($"[LobbyUI] Speaker muted: {!muted}");
-                UpdateVoiceButtons();
-            }
-            else
-            {
-                Debug.LogWarning("[LobbyUI] VoiceChatManager.Instance is null!");
-            }
-        }
-
-        private void UpdateVoiceButtons()
-        {
-            UpdateVoiceButtonsState();
-        }
 
         private void OnBackButtonClicked()
         {

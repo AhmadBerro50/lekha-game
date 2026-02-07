@@ -77,14 +77,41 @@ namespace Lekha.Core
                 if (System.IO.File.Exists(AvatarPath))
                 {
                     byte[] imageData = System.IO.File.ReadAllBytes(AvatarPath);
-                    cachedAvatar = new Texture2D(2, 2);
-                    cachedAvatar.LoadImage(imageData);
+
+                    // Validate we have actual image data
+                    if (imageData == null || imageData.Length < 100)
+                    {
+                        Debug.LogWarning($"Avatar file is too small or empty: {AvatarPath}");
+                        ClearAvatar();
+                        return null;
+                    }
+
+                    cachedAvatar = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                    bool loadSuccess = cachedAvatar.LoadImage(imageData);
+
+                    // Validate the texture loaded correctly (should be larger than 2x2)
+                    if (!loadSuccess || cachedAvatar.width <= 2 || cachedAvatar.height <= 2)
+                    {
+                        Debug.LogWarning($"Failed to decode avatar image: {AvatarPath}");
+                        UnityEngine.Object.Destroy(cachedAvatar);
+                        cachedAvatar = null;
+                        ClearAvatar();
+                        return null;
+                    }
+
                     return cachedAvatar;
+                }
+                else
+                {
+                    // File doesn't exist - clear the path
+                    Debug.LogWarning($"Avatar file not found: {AvatarPath}");
+                    AvatarPath = "";
                 }
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"Failed to load avatar from {AvatarPath}: {e.Message}");
+                AvatarPath = "";
             }
 
             return null;
