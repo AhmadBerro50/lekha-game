@@ -38,9 +38,14 @@ namespace Lekha.UI
         private TextMeshProUGUI refreshButtonText;
         private GameObject loadingIndicator;
 
+        // Online count display (lobby screen)
+        private TextMeshProUGUI onlineCountText;
+
         // Room panel elements
         private TextMeshProUGUI roomNameText;
         private TextMeshProUGUI roomCodeText;
+        private TextMeshProUGUI playerCountText;
+        private Transform onlinePlayersBar;
         private Transform playerListContent;
         private List<GameObject> playerListItems = new List<GameObject>();
         private Button readyButton;
@@ -78,6 +83,11 @@ namespace Lekha.UI
 
             if (NetworkManager.Instance != null)
             {
+                // Set initial online count from any previously received value
+                if (NetworkManager.Instance.OnlinePlayerCount > 0 && onlineCountText != null)
+                {
+                    onlineCountText.text = $"{NetworkManager.Instance.OnlinePlayerCount} Online";
+                }
                 NetworkManager.Instance.Connect();
             }
         }
@@ -217,6 +227,7 @@ namespace Lekha.UI
             NetworkManager.Instance.OnPositionSelected += OnPositionSelectedHandler;
             NetworkManager.Instance.OnGameStarted += OnGameStarted;
             NetworkManager.Instance.OnError += OnNetworkError;
+            NetworkManager.Instance.OnOnlineCountChanged += OnOnlineCountChanged;
         }
 
         private void UnsubscribeFromNetworkEvents()
@@ -233,6 +244,16 @@ namespace Lekha.UI
             NetworkManager.Instance.OnPositionSelected -= OnPositionSelectedHandler;
             NetworkManager.Instance.OnGameStarted -= OnGameStarted;
             NetworkManager.Instance.OnError -= OnNetworkError;
+            NetworkManager.Instance.OnOnlineCountChanged -= OnOnlineCountChanged;
+        }
+
+        private void OnOnlineCountChanged(int count)
+        {
+            Debug.Log($"[LobbyUI] OnOnlineCountChanged: {count}");
+            if (onlineCountText != null)
+            {
+                onlineCountText.text = $"{count} Online";
+            }
         }
 
         private void OnPositionSelectedHandler(string playerId, string newPosition, string oldPosition)
@@ -343,6 +364,36 @@ namespace Lekha.UI
 
             // Title
             CreateLabel(header.transform, "Title", "ONLINE LOBBY", 48, AccentCyan, new Vector2(0, 30), FontStyles.Bold);
+
+            // Online players count badge (top right)
+            GameObject onlineBadge = new GameObject("OnlineBadge");
+            onlineBadge.transform.SetParent(header.transform, false);
+            RectTransform badgeRect = onlineBadge.AddComponent<RectTransform>();
+            badgeRect.anchorMin = new Vector2(1, 1);
+            badgeRect.anchorMax = new Vector2(1, 1);
+            badgeRect.pivot = new Vector2(1, 1);
+            badgeRect.anchoredPosition = new Vector2(-20, -15);
+            badgeRect.sizeDelta = new Vector2(160, 36);
+
+            Image badgeBg = onlineBadge.AddComponent<Image>();
+            badgeBg.sprite = roundedSprite;
+            badgeBg.type = Image.Type.Sliced;
+            badgeBg.color = new Color(0.15f, 0.35f, 0.20f, 0.9f);
+
+            // Green dot
+            GameObject dot = new GameObject("Dot");
+            dot.transform.SetParent(onlineBadge.transform, false);
+            RectTransform dotRect = dot.AddComponent<RectTransform>();
+            dotRect.anchorMin = new Vector2(0, 0.5f);
+            dotRect.anchorMax = new Vector2(0, 0.5f);
+            dotRect.anchoredPosition = new Vector2(16, 0);
+            dotRect.sizeDelta = new Vector2(10, 10);
+            Image dotImg = dot.AddComponent<Image>();
+            dotImg.sprite = circleSprite;
+            dotImg.color = AccentGreen;
+
+            onlineCountText = CreateLabel(onlineBadge.transform, "Count", "1 Online", 18, AccentGreen, new Vector2(10, 0), FontStyles.Bold);
+            onlineCountText.alignment = TextAlignmentOptions.Center;
 
             // Player info bar
             GameObject infoBar = CreateCard(header.transform, "InfoBar", new Vector2(0, -50), new Vector2(980, 60));
@@ -695,7 +746,7 @@ namespace Lekha.UI
             rect.anchorMax = new Vector2(1, 1);
             rect.pivot = new Vector2(0.5f, 1);
             rect.anchoredPosition = Vector2.zero;
-            rect.sizeDelta = new Vector2(0, 110);
+            rect.sizeDelta = new Vector2(0, 160);
 
             // Header card background
             Image bg = header.AddComponent<Image>();
@@ -704,19 +755,64 @@ namespace Lekha.UI
             bg.color = CardBg;
 
             // Room name (large, centered)
-            roomNameText = CreateLabel(header.transform, "RoomName", "Room Name", 32, AccentCyan, new Vector2(0, 12), FontStyles.Bold);
+            roomNameText = CreateLabel(header.transform, "RoomName", "Room Name", 28, AccentCyan, new Vector2(0, 35), FontStyles.Bold);
 
-            // Room code below
-            roomCodeText = CreateLabel(header.transform, "RoomCode", "Public Room", 18, TextSecondary, new Vector2(0, -20));
+            // Room code below name
+            roomCodeText = CreateLabel(header.transform, "RoomCode", "Public Room", 16, TextSecondary, new Vector2(0, 10));
+
+            // Online players bar (bottom of header)
+            GameObject playersBar = new GameObject("OnlinePlayersBar");
+            playersBar.transform.SetParent(header.transform, false);
+            RectTransform barRect = playersBar.AddComponent<RectTransform>();
+            barRect.anchorMin = new Vector2(0, 0);
+            barRect.anchorMax = new Vector2(1, 0);
+            barRect.pivot = new Vector2(0.5f, 0);
+            barRect.anchoredPosition = new Vector2(0, 8);
+            barRect.sizeDelta = new Vector2(-30, 50);
+
+            // Bar background
+            Image barBg = playersBar.AddComponent<Image>();
+            barBg.sprite = roundedSprite;
+            barBg.type = Image.Type.Sliced;
+            barBg.color = new Color(0.08f, 0.10f, 0.16f, 0.8f);
+
+            // Player count text (left side)
+            playerCountText = CreateLabel(playersBar.transform, "PlayerCount", "0/4 Players", 16, TextSecondary, Vector2.zero, FontStyles.Bold);
+            RectTransform countRect = playerCountText.GetComponent<RectTransform>();
+            countRect.anchorMin = new Vector2(0, 0);
+            countRect.anchorMax = new Vector2(0, 1);
+            countRect.pivot = new Vector2(0, 0.5f);
+            countRect.anchoredPosition = new Vector2(15, 0);
+            countRect.sizeDelta = new Vector2(120, 0);
+            playerCountText.alignment = TextAlignmentOptions.Left;
+
+            // Online player avatars container (right side)
+            GameObject avatarsRow = new GameObject("AvatarsRow");
+            avatarsRow.transform.SetParent(playersBar.transform, false);
+            RectTransform avatarsRect = avatarsRow.AddComponent<RectTransform>();
+            avatarsRect.anchorMin = new Vector2(0, 0);
+            avatarsRect.anchorMax = new Vector2(1, 1);
+            avatarsRect.offsetMin = new Vector2(130, 5);
+            avatarsRect.offsetMax = new Vector2(-10, -5);
+
+            HorizontalLayoutGroup hlg = avatarsRow.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = 8;
+            hlg.childAlignment = TextAnchor.MiddleLeft;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+            hlg.padding = new RectOffset(5, 5, 2, 2);
+
+            onlinePlayersBar = avatarsRow.transform;
 
             // Leave button (top right corner)
             GameObject leaveBtn = new GameObject("LeaveBtn");
             leaveBtn.transform.SetParent(header.transform, false);
             RectTransform leaveBtnRect = leaveBtn.AddComponent<RectTransform>();
-            leaveBtnRect.anchorMin = new Vector2(1, 0.5f);
-            leaveBtnRect.anchorMax = new Vector2(1, 0.5f);
-            leaveBtnRect.anchoredPosition = new Vector2(-70, 0);
-            leaveBtnRect.sizeDelta = new Vector2(100, 40);
+            leaveBtnRect.anchorMin = new Vector2(1, 1);
+            leaveBtnRect.anchorMax = new Vector2(1, 1);
+            leaveBtnRect.pivot = new Vector2(1, 1);
+            leaveBtnRect.anchoredPosition = new Vector2(-15, -12);
+            leaveBtnRect.sizeDelta = new Vector2(90, 36);
 
             Image leaveBg = leaveBtn.AddComponent<Image>();
             leaveBg.sprite = roundedSprite;
@@ -735,7 +831,7 @@ namespace Lekha.UI
             leaveTextRect.offsetMax = Vector2.zero;
             TextMeshProUGUI leaveTextTmp = leaveText.AddComponent<TextMeshProUGUI>();
             leaveTextTmp.text = "Leave";
-            leaveTextTmp.fontSize = 16;
+            leaveTextTmp.fontSize = 15;
             leaveTextTmp.color = TextPrimary;
             leaveTextTmp.alignment = TextAlignmentOptions.Center;
             leaveTextTmp.fontStyle = FontStyles.Bold;
@@ -749,7 +845,7 @@ namespace Lekha.UI
             gridRect.anchorMin = new Vector2(0, 0);
             gridRect.anchorMax = new Vector2(1, 1);
             gridRect.offsetMin = new Vector2(20, 180);  // Space at bottom for actions bar
-            gridRect.offsetMax = new Vector2(-20, -120);  // Space at top for header
+            gridRect.offsetMax = new Vector2(-20, -170);  // Space at top for header
 
             playerListContent = gridSection.transform;
 
@@ -1450,9 +1546,9 @@ namespace Lekha.UI
             GameObject item = new GameObject("Room_" + room.RoomId);
             item.transform.SetParent(roomListContent, false);
             RectTransform rect = item.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(0, 70);
+            rect.sizeDelta = new Vector2(0, 85);
             LayoutElement le = item.AddComponent<LayoutElement>();
-            le.preferredHeight = 70;
+            le.preferredHeight = 85;
             le.flexibleWidth = 1;
 
             Image bg = item.AddComponent<Image>();
@@ -1468,14 +1564,14 @@ namespace Lekha.UI
             colors.highlightedColor = new Color(CardBgHover.r + 0.05f, CardBgHover.g + 0.05f, CardBgHover.b + 0.05f);
             btn.colors = colors;
 
-            // Room name - positioned on left side
+            // Room name - top left
             GameObject nameObj = new GameObject("Name");
             nameObj.transform.SetParent(item.transform, false);
             RectTransform nameRect = nameObj.AddComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0, 0);
+            nameRect.anchorMin = new Vector2(0, 0.5f);
             nameRect.anchorMax = new Vector2(1, 1);
-            nameRect.offsetMin = new Vector2(15, 5);  // Left padding
-            nameRect.offsetMax = new Vector2(-100, -5);  // Right padding (space for badge)
+            nameRect.offsetMin = new Vector2(15, 2);
+            nameRect.offsetMax = new Vector2(-100, -5);
             TextMeshProUGUI nameText = nameObj.AddComponent<TextMeshProUGUI>();
             nameText.text = room.RoomName;
             nameText.fontSize = 20;
@@ -1485,7 +1581,31 @@ namespace Lekha.UI
             nameText.verticalAlignment = VerticalAlignmentOptions.Middle;
             nameText.overflowMode = TextOverflowModes.Ellipsis;
 
-            // Player count badge - positioned on right side
+            // Player names row - bottom left
+            string playerNames = "";
+            foreach (var p in room.Players)
+            {
+                if (playerNames.Length > 0) playerNames += ", ";
+                playerNames += p.DisplayName ?? "Player";
+            }
+            if (string.IsNullOrEmpty(playerNames)) playerNames = "No players yet";
+
+            GameObject playersObj = new GameObject("Players");
+            playersObj.transform.SetParent(item.transform, false);
+            RectTransform playersRect = playersObj.AddComponent<RectTransform>();
+            playersRect.anchorMin = new Vector2(0, 0);
+            playersRect.anchorMax = new Vector2(1, 0.5f);
+            playersRect.offsetMin = new Vector2(15, 5);
+            playersRect.offsetMax = new Vector2(-100, -2);
+            TextMeshProUGUI playersTmp = playersObj.AddComponent<TextMeshProUGUI>();
+            playersTmp.text = playerNames;
+            playersTmp.fontSize = 14;
+            playersTmp.color = TextSecondary;
+            playersTmp.alignment = TextAlignmentOptions.Left;
+            playersTmp.verticalAlignment = VerticalAlignmentOptions.Middle;
+            playersTmp.overflowMode = TextOverflowModes.Ellipsis;
+
+            // Player count badge - right side
             GameObject badge = new GameObject("Badge");
             badge.transform.SetParent(item.transform, false);
             RectTransform badgeRect = badge.AddComponent<RectTransform>();
@@ -1590,6 +1710,7 @@ namespace Lekha.UI
             }
 
             UpdatePlayerGrid(room);
+            UpdateOnlinePlayersBar(room);
             UpdateRoomButtons(room);
             SetState(LobbyState.InRoom);
         }
@@ -1601,6 +1722,7 @@ namespace Lekha.UI
 
             Debug.Log($"[LobbyUI] Room updated, players: {room.Players.Count}");
             UpdatePlayerGrid(room);
+            UpdateOnlinePlayersBar(room);
             UpdateRoomButtons(room);
         }
 
@@ -1805,6 +1927,120 @@ namespace Lekha.UI
                 {
                     slotBg.color = new Color(0.08f, 0.09f, 0.11f, 0.9f);
                 }
+            }
+        }
+
+        private void UpdateOnlinePlayersBar(GameRoom room)
+        {
+            // Update player count text
+            if (playerCountText != null)
+            {
+                int count = room.Players.Count;
+                playerCountText.text = $"{count}/4 Online";
+                playerCountText.color = count >= 4 ? AccentGreen : AccentCyan;
+            }
+
+            // Rebuild avatars row
+            if (onlinePlayersBar != null)
+            {
+                // Clear existing avatars
+                for (int i = onlinePlayersBar.childCount - 1; i >= 0; i--)
+                {
+                    Destroy(onlinePlayersBar.GetChild(i).gameObject);
+                }
+
+                // Create avatar chip for each connected player
+                foreach (var player in room.Players)
+                {
+                    CreatePlayerChip(onlinePlayersBar, player);
+                }
+            }
+        }
+
+        private void CreatePlayerChip(Transform parent, NetworkPlayer player)
+        {
+            bool isLocal = player.PlayerId == NetworkManager.Instance?.LocalPlayerId;
+
+            GameObject chip = new GameObject("Chip_" + player.DisplayName);
+            chip.transform.SetParent(parent, false);
+
+            RectTransform chipRect = chip.AddComponent<RectTransform>();
+            chipRect.sizeDelta = new Vector2(130, 36);
+
+            // Chip background
+            Image chipBg = chip.AddComponent<Image>();
+            chipBg.sprite = roundedSprite;
+            chipBg.type = Image.Type.Sliced;
+            chipBg.color = isLocal
+                ? new Color(AccentCyan.r, AccentCyan.g, AccentCyan.b, 0.2f)
+                : new Color(0.15f, 0.17f, 0.22f, 0.9f);
+
+            LayoutElement le = chip.AddComponent<LayoutElement>();
+            le.preferredWidth = 130;
+            le.preferredHeight = 36;
+
+            // Avatar circle (left side of chip)
+            GameObject avatar = new GameObject("Avatar");
+            avatar.transform.SetParent(chip.transform, false);
+            RectTransform avatarRect = avatar.AddComponent<RectTransform>();
+            avatarRect.anchorMin = new Vector2(0, 0.5f);
+            avatarRect.anchorMax = new Vector2(0, 0.5f);
+            avatarRect.anchoredPosition = new Vector2(18, 0);
+            avatarRect.sizeDelta = new Vector2(26, 26);
+
+            Image avatarBg = avatar.AddComponent<Image>();
+            avatarBg.sprite = circleSprite;
+            Color chipColor = player.IsReady ? AccentGreen : AccentCyan;
+            avatarBg.color = chipColor;
+
+            // Avatar initial
+            GameObject initialObj = new GameObject("Initial");
+            initialObj.transform.SetParent(avatar.transform, false);
+            RectTransform initRect = initialObj.AddComponent<RectTransform>();
+            initRect.anchorMin = Vector2.zero;
+            initRect.anchorMax = Vector2.one;
+            initRect.offsetMin = Vector2.zero;
+            initRect.offsetMax = Vector2.zero;
+            TextMeshProUGUI initText = initialObj.AddComponent<TextMeshProUGUI>();
+            string initial = !string.IsNullOrEmpty(player.DisplayName) ? player.DisplayName[0].ToString().ToUpper() : "?";
+            initText.text = initial;
+            initText.fontSize = 14;
+            initText.color = BgDark;
+            initText.alignment = TextAlignmentOptions.Center;
+            initText.fontStyle = FontStyles.Bold;
+
+            // Player name (right of avatar)
+            GameObject nameObj = new GameObject("Name");
+            nameObj.transform.SetParent(chip.transform, false);
+            RectTransform nameRect = nameObj.AddComponent<RectTransform>();
+            nameRect.anchorMin = new Vector2(0, 0);
+            nameRect.anchorMax = new Vector2(1, 1);
+            nameRect.offsetMin = new Vector2(35, 0);
+            nameRect.offsetMax = new Vector2(-5, 0);
+            TextMeshProUGUI nameText = nameObj.AddComponent<TextMeshProUGUI>();
+            string displayName = player.DisplayName ?? "Player";
+            if (isLocal) displayName += " (You)";
+            nameText.text = displayName;
+            nameText.fontSize = 13;
+            nameText.color = isLocal ? AccentCyan : TextPrimary;
+            nameText.alignment = TextAlignmentOptions.Left;
+            nameText.verticalAlignment = VerticalAlignmentOptions.Middle;
+            nameText.fontStyle = isLocal ? FontStyles.Bold : FontStyles.Normal;
+            nameText.overflowMode = TextOverflowModes.Ellipsis;
+
+            // Ready indicator dot (right edge)
+            if (player.IsReady)
+            {
+                GameObject dot = new GameObject("ReadyDot");
+                dot.transform.SetParent(chip.transform, false);
+                RectTransform dotRect = dot.AddComponent<RectTransform>();
+                dotRect.anchorMin = new Vector2(1, 0.5f);
+                dotRect.anchorMax = new Vector2(1, 0.5f);
+                dotRect.anchoredPosition = new Vector2(-8, 0);
+                dotRect.sizeDelta = new Vector2(8, 8);
+                Image dotImg = dot.AddComponent<Image>();
+                dotImg.sprite = circleSprite;
+                dotImg.color = AccentGreen;
             }
         }
 

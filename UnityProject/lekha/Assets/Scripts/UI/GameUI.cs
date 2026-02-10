@@ -187,6 +187,12 @@ namespace Lekha.UI
                 NetworkGameSync.Instance.OnBotReplacedUI -= OnBotReplacedUI;
             }
 
+            // Unsubscribe from emoji events
+            if (NetworkManager.Instance != null)
+            {
+                NetworkManager.Instance.OnEmojiReceived -= OnRemoteEmojiReceived;
+            }
+
             // Destroy the canvas and null out references
             if (mainCanvas != null)
             {
@@ -204,10 +210,44 @@ namespace Lekha.UI
         public void Reinitialize()
         {
             Cleanup();
+            ResetGameplayState();
             CreateUI();
             SubscribeToEvents();
             if (watchdogCoroutine != null) StopCoroutine(watchdogCoroutine);
             watchdogCoroutine = StartCoroutine(WatchdogCoroutine());
+        }
+
+        /// <summary>
+        /// Reset all gameplay state flags to prevent stale state between rounds/games.
+        /// </summary>
+        private void ResetGameplayState()
+        {
+            isPassPhase = false;
+            isAnimating = false;
+            isProcessingPlay = false;
+            selectedForPass.Clear();
+            lastActionTime = Time.time;
+            nextAllowedPlayTime = 0f;
+            StopTransientCoroutines();
+        }
+
+        private Coroutine emojiAutoCloseCoroutine = null;
+        private Coroutine delayedClearTrickCoroutine = null;
+        private Coroutine trickWinnerHighlightCoroutine = null;
+        private Coroutine delayedHighlightCoroutine = null;
+        private Coroutine delayedStartNextRoundCoroutine = null;
+
+        /// <summary>
+        /// Stop all transient coroutines that could interfere with round transitions.
+        /// </summary>
+        private void StopTransientCoroutines()
+        {
+            if (emojiAutoCloseCoroutine != null) { StopCoroutine(emojiAutoCloseCoroutine); emojiAutoCloseCoroutine = null; }
+            if (delayedClearTrickCoroutine != null) { StopCoroutine(delayedClearTrickCoroutine); delayedClearTrickCoroutine = null; }
+            if (trickWinnerHighlightCoroutine != null) { StopCoroutine(trickWinnerHighlightCoroutine); trickWinnerHighlightCoroutine = null; }
+            if (delayedHighlightCoroutine != null) { StopCoroutine(delayedHighlightCoroutine); delayedHighlightCoroutine = null; }
+            if (delayedStartNextRoundCoroutine != null) { StopCoroutine(delayedStartNextRoundCoroutine); delayedStartNextRoundCoroutine = null; }
+            if (pendingAIPlayCoroutine != null) { StopCoroutine(pendingAIPlayCoroutine); pendingAIPlayCoroutine = null; }
         }
 
         private void OnDestroy()
@@ -755,9 +795,18 @@ namespace Lekha.UI
             // Show emoji for the local player
             Player localPlayer = GameManager.Instance?.GetHumanPlayer();
             PlayerPosition localPos = localPlayer?.Position ?? PlayerPosition.South;
+            Debug.Log($"[GameUI] Local player pos: {localPos}, IsOnline: {GameManager.Instance?.IsOnlineGame}");
             if (playerInfoPanels.TryGetValue(localPos, out PlayerInfoPanel panel))
             {
                 panel.ShowEmoji(emoji);
+            }
+
+            // Send emoji to other players in online game
+            if (GameManager.Instance != null && GameManager.Instance.IsOnlineGame &&
+                NetworkManager.Instance != null)
+            {
+                Debug.Log($"[GameUI] Sending emoji '{emoji}' from position {localPos} to server");
+                NetworkManager.Instance.SendEmojiReaction(emoji, localPos.ToString());
             }
 
             CloseEmojiPanel();
@@ -794,7 +843,8 @@ namespace Lekha.UI
             Debug.Log("[GameUI] Emoji panel opened");
 
             // Auto-close after 5 seconds
-            StartCoroutine(AutoCloseEmojiPanel());
+            if (emojiAutoCloseCoroutine != null) StopCoroutine(emojiAutoCloseCoroutine);
+            emojiAutoCloseCoroutine = StartCoroutine(AutoCloseEmojiPanel());
         }
 
         private void CloseEmojiPanel()
@@ -1422,6 +1472,12 @@ namespace Lekha.UI
                     NetworkGameSync.Instance.OnPlayerReconnectedUI += OnPlayerReconnectedUI;
                     NetworkGameSync.Instance.OnBotReplacedUI += OnBotReplacedUI;
                 }
+
+                // Subscribe to emoji reactions from other players
+                if (NetworkManager.Instance != null)
+                {
+                    NetworkManager.Instance.OnEmojiReceived += OnRemoteEmojiReceived;
+                }
             }
             else
             {
@@ -1598,6 +1654,14 @@ namespace Lekha.UI
 
         private void OnCardsDealt()
         {
+            // Reset gameplay state for new round
+            isPassPhase = false;
+            isProcessingPlay = false;
+            selectedForPass.Clear();
+            nextAllowedPlayTime = 0f;
+            StopTransientCoroutines();
+            ClearTrickArea();
+
             // Recreate player info panels to ensure correct visual positions
             // (online game config may have been set after initial panel creation)
             CreatePlayerInfoPanels();
@@ -1937,6 +2001,7 @@ namespace Lekha.UI
                         selectedForPass.Add(cardUI);
                         cardUI.SetSelected(true);
                         SoundManager.Instance?.PlayCardSelect();
+                        HapticManager.Instance?.LightTap();
                         // Refresh which cards are passable now
                         UpdatePassableCards();
                     }
@@ -2030,8 +2095,9 @@ namespace Lekha.UI
             // Cancel any pending AI play immediately
             CancelPendingAIPlay();
 
-            // Play sound
+            // Play sound and haptic
             SoundManager.Instance?.PlayCardPlay();
+            HapticManager.Instance?.MediumTap();
 
             // Check for special cards and play dramatic effect
             Debug.Log($"[OnCardPlayed] Checking special cards: {card.Suit} {card.Rank}, IsQueenOfSpades={card.IsQueenOfSpades()}, SpecialCardEffect.Instance={SpecialCardEffect.Instance != null}");
@@ -2128,7 +2194,8 @@ namespace Lekha.UI
                 {
                     // It's local player's turn - highlight playable cards after cooldown
                     Debug.Log($"[OnCardPlayAnimationComplete] Local player's turn - highlighting in {delay:F2}s");
-                    StartCoroutine(DelayedHighlightCards(delay));
+                    if (delayedHighlightCoroutine != null) StopCoroutine(delayedHighlightCoroutine);
+                    delayedHighlightCoroutine = StartCoroutine(DelayedHighlightCards(delay));
                 }
                 else if (!GameManager.Instance.IsOnlineGame)
                 {
@@ -2335,8 +2402,9 @@ namespace Lekha.UI
 
             Debug.Log($"[OnTrickWon] {winner.PlayerName} wins. TrickCards count: {trickCards.Count}. Lock set for {TRICK_COMPLETE_COOLDOWN}s");
 
-            // Play sound
+            // Play sound and haptic
             SoundManager.Instance?.PlayTrickWin();
+            HapticManager.Instance?.HeavyTap();
 
             // Highlight the winner's panel
             HighlightTrickWinner(winner.Position);
@@ -2384,7 +2452,8 @@ namespace Lekha.UI
             }
             else
             {
-                StartCoroutine(DelayedClearTrickArea(0.8f));
+                if (delayedClearTrickCoroutine != null) StopCoroutine(delayedClearTrickCoroutine);
+                delayedClearTrickCoroutine = StartCoroutine(DelayedClearTrickArea(0.8f));
             }
 
             instructionText.text = $"{winner.PlayerName} wins the trick!";
@@ -2393,7 +2462,8 @@ namespace Lekha.UI
 
         private void HighlightTrickWinner(PlayerPosition position)
         {
-            StartCoroutine(AnimateTrickWinnerHighlight(position));
+            if (trickWinnerHighlightCoroutine != null) StopCoroutine(trickWinnerHighlightCoroutine);
+            trickWinnerHighlightCoroutine = StartCoroutine(AnimateTrickWinnerHighlight(position));
         }
 
         private System.Collections.IEnumerator AnimateTrickWinnerHighlight(PlayerPosition position)
@@ -2506,6 +2576,7 @@ namespace Lekha.UI
         private void OnPassPhaseComplete()
         {
             Debug.Log("[OnPassPhaseComplete] Pass phase completed, refreshing hand display");
+            ResetWatchdogTimer();
             // Set animating flag BEFORE displaying cards so OnTrickStarted knows to wait
             isAnimating = true;
             DisplayPlayerHandAnimatedWithCallback(() => {
@@ -2513,6 +2584,7 @@ namespace Lekha.UI
                 Debug.Log("[OnPassPhaseComplete] Hand animation complete, isAnimating = false");
             });
             isPassPhase = false;
+            selectedForPass.Clear();
             Debug.Log($"[OnPassPhaseComplete] isPassPhase = {isPassPhase}, isAnimating = {isAnimating}");
         }
 
@@ -2629,6 +2701,7 @@ namespace Lekha.UI
         private void OnRoundEnded(Player[] players)
         {
             SoundManager.Instance?.PlayRoundEnd();
+            HapticManager.Instance?.MediumTap();
             UpdateScoreText();
             instructionText.text = "Round ended! Starting next round...";
 
@@ -2650,7 +2723,8 @@ namespace Lekha.UI
                 scoreSummaryPopup.RecordRoundHistory(roundNum, southScore, eastScore, northScore, westScore);
             }
 
-            StartCoroutine(DelayedStartNextRound(2f));
+            if (delayedStartNextRoundCoroutine != null) StopCoroutine(delayedStartNextRoundCoroutine);
+            delayedStartNextRoundCoroutine = StartCoroutine(DelayedStartNextRound(2f));
         }
 
         private void StartNextRound()
@@ -2670,6 +2744,14 @@ namespace Lekha.UI
                 else
                 {
                     // Non-host: wait for cards from host
+                    // GUARD: If we already received CardDealt and progressed past RoundEnd,
+                    // don't overwrite the state (race condition with host's CardDealt broadcast)
+                    var currentState = GameManager.Instance.CurrentState;
+                    if (currentState != GameState.RoundEnd)
+                    {
+                        Debug.Log($"[StartNextRound] Non-host: state already {currentState}, skipping state reset to Dealing");
+                        return;
+                    }
                     instructionText.text = "Waiting for next round...";
                     GameManager.Instance.SetState_Public(GameState.Dealing);
                 }
@@ -2692,11 +2774,13 @@ namespace Lekha.UI
             if (localPlayerWon)
             {
                 SoundManager.Instance?.PlayGameWin();
+                HapticManager.Instance?.SuccessTap();
                 instructionText.text = "Game Over! You WIN!";
             }
             else
             {
                 SoundManager.Instance?.PlayGameLose();
+                HapticManager.Instance?.ErrorTap();
                 instructionText.text = "Game Over! You LOSE!";
             }
 
@@ -2833,7 +2917,10 @@ namespace Lekha.UI
             foreach (var card in playerHandCards)
             {
                 if (card != null)
+                {
+                    card.OnCardClicked -= OnPlayerCardClicked;
                     Destroy(card.gameObject);
+                }
             }
             playerHandCards.Clear();
         }
@@ -2854,6 +2941,20 @@ namespace Lekha.UI
             if (playerInfoPanels.TryGetValue(position, out PlayerInfoPanel panel))
             {
                 panel.ShowEmoji(emoji);
+                HapticManager.Instance?.LightTap();
+            }
+        }
+
+        /// <summary>
+        /// Called when a remote player sends an emoji reaction
+        /// </summary>
+        private void OnRemoteEmojiReceived(string emoji, string positionStr)
+        {
+            if (System.Enum.TryParse<PlayerPosition>(positionStr, out PlayerPosition serverPos))
+            {
+                // playerInfoPanels is keyed by server position
+                Debug.Log($"[GameUI] Remote emoji received: {emoji} from {serverPos}");
+                ShowEmojiForPlayer(emoji, serverPos);
             }
         }
 

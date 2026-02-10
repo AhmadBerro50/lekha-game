@@ -17,6 +17,15 @@ namespace Lekha.Audio
         private float masterVolume = 1f;
         private float sfxVolume = 0.7f;
 
+        // Deterministic noise generator (avoids Random.value issues on Android IL2CPP)
+        private int noiseSeed = 12345;
+
+        private float NextNoise()
+        {
+            noiseSeed = (noiseSeed * 1103515245 + 12345) & 0x7fffffff;
+            return (noiseSeed / (float)0x7fffffff) - 0.5f; // returns -0.5 to 0.5
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -28,6 +37,7 @@ namespace Lekha.Audio
             DontDestroyOnLoad(gameObject);
 
             audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
             GenerateSoundEffects();
         }
 
@@ -147,7 +157,7 @@ namespace Lekha.Audio
                 float noise = 0;
                 if (t < 0.1f) // Only at the start
                 {
-                    noise = (Random.value - 0.5f) * (1 - t * 10) * 0.4f;
+                    noise = NextNoise() * (1 - t * 10) * 0.4f;
                 }
 
                 data[i] = lowThump + midBody + highSnap + noise;
@@ -170,7 +180,7 @@ namespace Lekha.Audio
                 float t = (float)i / samples;
                 float envelope = (1 - t) * (1 - t);
                 // Quick swoosh sound
-                data[i] = (Random.value - 0.5f) * envelope * 0.4f;
+                data[i] = NextNoise() * envelope * 0.4f;
             }
 
             return CreateClip("card_deal", data, sampleRate);
@@ -337,7 +347,7 @@ namespace Lekha.Audio
                 if (t < 0.05f)
                 {
                     float impactT = t / 0.05f;
-                    impact = (Random.value - 0.5f) * 2f * (1 - impactT);
+                    impact = NextNoise() * 2f * (1 - impactT);
                     impact += Mathf.Sin(2 * Mathf.PI * 60 * i / sampleRate) * (1 - impactT) * 0.8f;
                 }
 
@@ -348,7 +358,7 @@ namespace Lekha.Audio
                 float crack = 0;
                 if (t < 0.2f)
                 {
-                    crack = (Random.value - 0.5f) * Mathf.Exp(-t * 15f) * 0.6f;
+                    crack = NextNoise() * Mathf.Exp(-t * 15f) * 0.6f;
                 }
 
                 // Resonance
@@ -379,7 +389,7 @@ namespace Lekha.Audio
                 if (t < 0.08f)
                 {
                     float impactT = t / 0.08f;
-                    impact = (Random.value - 0.5f) * 2.5f * (1 - impactT);
+                    impact = NextNoise() * 2.5f * (1 - impactT);
                     impact += Mathf.Sin(2 * Mathf.PI * 50 * i / sampleRate) * (1 - impactT);
                 }
 
@@ -391,11 +401,11 @@ namespace Lekha.Audio
                 float crack = 0;
                 if (t < 0.3f)
                 {
-                    crack = (Random.value - 0.5f) * Mathf.Exp(-t * 10f) * 0.7f;
+                    crack = NextNoise() * Mathf.Exp(-t * 10f) * 0.7f;
                     // Secondary cracks
                     if (t > 0.1f && t < 0.2f)
                     {
-                        crack += (Random.value - 0.5f) * 0.4f;
+                        crack += NextNoise() * 0.4f;
                     }
                 }
 

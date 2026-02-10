@@ -456,6 +456,9 @@ namespace Lekha.Network
 
         private void HandleCardDealt(NetworkMessage message)
         {
+            // Clear auto-pass tracking for new round
+            autoPassSubmitted.Clear();
+
             try
             {
                 // Parse position and hand
@@ -724,10 +727,13 @@ namespace Lekha.Network
         /// <summary>
         /// HOST: Auto-pass cards for all disconnected/bot players during pass phase
         /// </summary>
+        private HashSet<PlayerPosition> autoPassSubmitted = new HashSet<PlayerPosition>();
+
         public void AutoPassForDisconnectedPlayers()
         {
             if (!isOnlineGame || !isHost) return;
             if (GameManager.Instance == null) return;
+            if (GameManager.Instance.CurrentState != GameState.PassingCards) return;
 
             var allPositions = new List<PlayerPosition>();
             foreach (var pos in GameManager.Instance.DisconnectedPositions) allPositions.Add(pos);
@@ -735,6 +741,9 @@ namespace Lekha.Network
 
             foreach (PlayerPosition pos in allPositions)
             {
+                // Guard: skip if already auto-passed for this position this round
+                if (autoPassSubmitted.Contains(pos)) continue;
+
                 Player player = GameManager.Instance.GetPlayerAtPosition(pos);
                 if (player == null || player.Hand.Count < 3) continue;
 
@@ -742,6 +751,9 @@ namespace Lekha.Network
                 if (passCards == null || passCards.Count != 3) continue;
 
                 PlayerPosition toPos = Player.GetPlayerToRight(pos);
+
+                // Mark as submitted BEFORE removing cards to prevent double-call
+                autoPassSubmitted.Add(pos);
 
                 // Remove cards from hand locally
                 player.RemoveCards(passCards);
@@ -761,6 +773,7 @@ namespace Lekha.Network
             isHost = false;
             localPosition = null;
             currentNetworkState = null;
+            autoPassSubmitted.Clear();
             pendingActions.Clear();
 
             // Hide ping display when leaving online game

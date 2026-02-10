@@ -103,6 +103,15 @@ namespace Lekha.GameLogic
                 Debug.Log("SoundManager created.");
             }
 
+            // Create HapticManager
+            if (HapticManager.Instance == null)
+            {
+                GameObject hapticManager = new GameObject("HapticManager");
+                hapticManager.AddComponent<HapticManager>();
+                DontDestroyOnLoad(hapticManager);
+                Debug.Log("HapticManager created.");
+            }
+
             // Create GameUI
             if (GameUI.Instance == null)
             {

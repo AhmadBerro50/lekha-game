@@ -63,6 +63,12 @@ namespace Lekha.Network
         GameState,
         BotReplaced,
 
+        // Social
+        EmojiReaction,
+
+        // Meta
+        OnlineCount,
+
         // Spectator
         SpectateRoom,
         StopSpectating,
@@ -249,6 +255,8 @@ namespace Lekha.Network
         public event Action<PlayerDisconnectInfo> OnPlayerDisconnected;  // Player temporarily disconnected
         public event Action<NetworkPlayer> OnPlayerReconnected;  // Player reconnected
         public event Action<BotReplacedData> OnBotReplaced;  // Player replaced by bot after timeout
+        public event Action<string, string> OnEmojiReceived;  // emoji, fromPosition
+        public event Action<int> OnOnlineCountChanged;  // total players online
         public event Action<string, string, string> OnPositionSelected;  // playerId, newPosition, oldPosition
         public event Action<string> OnGameStarted;
         public event Action<NetworkMessage> OnMessageReceived;
@@ -736,6 +744,14 @@ namespace Lekha.Network
                     HandleBotReplaced(message);
                     break;
 
+                case NetworkMessageType.EmojiReaction:
+                    HandleEmojiReaction(message);
+                    break;
+
+                case NetworkMessageType.OnlineCount:
+                    HandleOnlineCount(message);
+                    break;
+
                 case NetworkMessageType.PositionSelected:
                     HandlePositionSelected(message);
                     break;
@@ -767,21 +783,31 @@ namespace Lekha.Network
         {
             try
             {
+                Debug.Log($"[NetworkManager] Connected message Data: {message.Data}");
                 var data = JsonUtility.FromJson<ConnectedData>(message.Data);
                 if (!string.IsNullOrEmpty(data.PlayerId))
                 {
                     LocalPlayerId = data.PlayerId;
                     LocalPlayer.PlayerId = data.PlayerId;
                 }
+                Debug.Log($"[NetworkManager] Connected: OnlineCount from server = {data.OnlineCount}");
+                if (data.OnlineCount > 0)
+                {
+                    OnlinePlayerCount = data.OnlineCount;
+                    OnOnlineCountChanged?.Invoke(data.OnlineCount);
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManager] Failed to parse Connected data: {ex.Message}");
+            }
 
             SetState(ConnectionState.Connected);
             Debug.Log($"[NetworkManager] Fully connected as {LocalPlayer.DisplayName}");
         }
 
         [Serializable]
-        private class ConnectedData { public string PlayerId; }
+        private class ConnectedData { public string PlayerId; public int OnlineCount; }
 
         [Serializable]
         private class ProfileInfoData
@@ -941,6 +967,63 @@ namespace Lekha.Network
             {
                 Debug.LogError($"[NetworkManager] Failed to parse bot replaced: {ex.Message}");
             }
+        }
+
+        private void HandleEmojiReaction(NetworkMessage message)
+        {
+            try
+            {
+                var data = JsonUtility.FromJson<EmojiReactionData>(message.Data);
+                Debug.Log($"[NetworkManager] Emoji received: {data.Emoji} from {data.Position}");
+                OnEmojiReceived?.Invoke(data.Emoji, data.Position);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManager] Failed to parse emoji reaction: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Send an emoji reaction to all other players in the room
+        /// </summary>
+        public void SendEmojiReaction(string emoji, string position)
+        {
+            var data = new EmojiReactionData { Emoji = emoji, Position = position };
+            SendGameAction(NetworkMessageType.EmojiReaction, JsonUtility.ToJson(data));
+        }
+
+        private void HandleOnlineCount(NetworkMessage message)
+        {
+            try
+            {
+                Debug.Log($"[NetworkManager] OnlineCount message received, Data: {message.Data}");
+                var data = JsonUtility.FromJson<OnlineCountData>(message.Data);
+                OnlinePlayerCount = data.Count;
+                Debug.Log($"[NetworkManager] Online count updated to: {data.Count}");
+                OnOnlineCountChanged?.Invoke(data.Count);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManager] Failed to parse online count: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Current number of players connected to the server
+        /// </summary>
+        public int OnlinePlayerCount { get; private set; }
+
+        [Serializable]
+        private class OnlineCountData
+        {
+            public int Count;
+        }
+
+        [Serializable]
+        private class EmojiReactionData
+        {
+            public string Emoji;
+            public string Position;
         }
 
         [Serializable]

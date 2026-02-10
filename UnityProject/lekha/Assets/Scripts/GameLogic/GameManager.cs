@@ -163,21 +163,29 @@ namespace Lekha.GameLogic
 
                 // Set flag to prevent re-sending to network
                 isProcessingRemotePlay = true;
-
-                // For non-host clients, remote players' hands may be empty
-                // We need to add the card temporarily to allow PlayCard to work
-                bool cardWasInHand = player.Hand.Any(c => c.Equals(card));
-                if (!cardWasInHand)
+                try
                 {
-                    // Add card to hand so PlayCard can remove it
-                    player.ReceiveCards(new List<Card> { card });
-                    Debug.Log($"[GameManager] Added card {card} to {player.PlayerName}'s hand for play");
+                    // For non-host clients, remote players' hands may be empty
+                    // We need to add the card temporarily to allow PlayCard to work
+                    bool cardWasInHand = player.Hand.Any(c => c.Equals(card));
+                    if (!cardWasInHand)
+                    {
+                        // Add card to hand so PlayCard can remove it
+                        player.ReceiveCards(new List<Card> { card });
+                        Debug.Log($"[GameManager] Added card {card} to {player.PlayerName}'s hand for play");
+                    }
+
+                    // Play the card (this updates local game state)
+                    PlayCard(player, card);
                 }
-
-                // Play the card (this updates local game state)
-                PlayCard(player, card);
-
-                isProcessingRemotePlay = false;
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[GameManager] Exception in HandleRemoteCardPlayed: {e.Message}\n{e.StackTrace}");
+                }
+                finally
+                {
+                    isProcessingRemotePlay = false;
+                }
             }
         }
 
@@ -326,6 +334,10 @@ namespace Lekha.GameLogic
             // Random starting player for first round
             startingPlayerIndex = Random.Range(0, 4);
 
+            // Clear disconnect/bot tracking from previous game
+            disconnectedPositions.Clear();
+            botReplacedPositions.Clear();
+
             // Reset all player scores
             foreach (var player in players)
             {
@@ -367,6 +379,14 @@ namespace Lekha.GameLogic
             bufferedPassCards = null;
             receivedPassFrom.Clear();
 
+            // Reset round state for non-host clients (host resets these in StartNewRound)
+            tricksPlayedThisRound = 0;
+            queenOfSpadesTaker = null;
+            isProcessingRemotePlay = false; // Safety reset between rounds
+            Lekha.AI.AIPlayer.ResetRoundTracking();
+
+            Debug.Log($"[GameManager] NotifyCardsDealt: Reset round state (tricksPlayed=0, isProcessingRemotePlay=false)");
+
             OnCardsDealt?.Invoke();
             SetState(GameState.PassingCards);
         }
@@ -389,7 +409,13 @@ namespace Lekha.GameLogic
             roundNumber++;
             tricksPlayedThisRound = 0;
             queenOfSpadesTaker = null; // Reset queen taker tracking
+            isProcessingRemotePlay = false; // Safety reset between rounds
             Lekha.AI.AIPlayer.ResetRoundTracking();
+
+            // Reset pass state for new round (host path - non-host resets in NotifyCardsDealt)
+            localPassSubmitted = false;
+            bufferedPassCards = null;
+            receivedPassFrom.Clear();
 
             Debug.Log($"=== ROUND {roundNumber} ===");
 
@@ -552,6 +578,10 @@ namespace Lekha.GameLogic
             if (isOnlineGame && !isProcessingRemotePlay)
             {
                 NetworkGameSync.Instance.SendCardPlayed(player.Position, card, tricksPlayedThisRound);
+            }
+            else if (isOnlineGame && isProcessingRemotePlay)
+            {
+                Debug.Log($"[PlayCard] Skipping SendCardPlayed for {player.Position} - isProcessingRemotePlay=true (remote play relay)");
             }
 
             // Move to next player or end trick BEFORE firing event

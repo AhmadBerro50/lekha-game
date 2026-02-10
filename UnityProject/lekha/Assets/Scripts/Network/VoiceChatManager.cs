@@ -73,6 +73,14 @@ namespace Lekha.Network
         {
             if (isInitialized) return true;
 
+            // Request microphone permission on Android before initializing
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone))
+            {
+                UnityEngine.Android.Permission.RequestUserPermission(UnityEngine.Android.Permission.Microphone);
+            }
+#endif
+
             try
             {
                 rtcEngine = Agora.Rtc.RtcEngine.CreateAgoraRtcEngine();
@@ -102,6 +110,10 @@ namespace Lekha.Network
 
                 // Optimize for voice chat
                 rtcEngine.SetAudioProfile(AUDIO_PROFILE_TYPE.AUDIO_PROFILE_SPEECH_STANDARD);
+
+                // Route audio to loudspeaker instead of earpiece
+                rtcEngine.SetDefaultAudioRouteToSpeakerphone(true);
+                rtcEngine.SetEnableSpeakerphone(true);
 
                 isInitialized = true;
                 Debug.Log("[VoiceChatManager] Agora initialized successfully");

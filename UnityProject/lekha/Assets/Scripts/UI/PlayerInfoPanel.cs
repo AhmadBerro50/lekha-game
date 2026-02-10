@@ -46,6 +46,12 @@ namespace Lekha.UI
         private bool isDisconnected = false;
         private bool isBotReplaced = false;
 
+        // Score animation tracking
+        private int displayedRoundPoints = 0;
+        private int displayedTotalPoints = 0;
+        private Coroutine roundScoreCoroutine;
+        private Coroutine totalScoreCoroutine;
+
         // State
         private bool isTurnActive = false;
 
@@ -82,11 +88,7 @@ namespace Lekha.UI
 
         private void OnDestroy()
         {
-            // Clean up the special cards container since it's parented to canvas, not this panel
-            if (specialCardsContainer != null)
-            {
-                Destroy(specialCardsContainer);
-            }
+            // Special cards container is now parented to this panel, so it auto-destroys
         }
 
         private void BuildUI()
@@ -515,51 +517,22 @@ namespace Lekha.UI
 
         /// <summary>
         /// Create indicators for special cards taken (Queen of Spades, 10 of Diamonds)
-        /// Position based on player location:
-        /// - East/West: UNDER the panel
-        /// - North/South: NEXT TO the panel
+        /// Centered inside the panel so they never go off-screen
         /// </summary>
         private void CreateSpecialCardsIndicator()
         {
-            // Container for special card icons
+            // Container for special card icons - parented to THIS panel, not canvas
             specialCardsContainer = new GameObject("SpecialCards");
-            specialCardsContainer.transform.SetParent(transform.parent, false); // Parent to canvas, not panel
+            specialCardsContainer.transform.SetParent(transform, false);
 
             RectTransform containerRect = specialCardsContainer.AddComponent<RectTransform>();
 
-            // Position based on visual position (where panel is on screen)
-            switch (visualPosition)
-            {
-                case PlayerPosition.South: // Bottom - put to the RIGHT of panel
-                    containerRect.anchorMin = new Vector2(0, 0);
-                    containerRect.anchorMax = new Vector2(0, 0);
-                    containerRect.pivot = new Vector2(0, 0.5f);
-                    containerRect.anchoredPosition = new Vector2(panelRect.anchoredPosition.x + 85, panelRect.anchoredPosition.y + 40);
-                    break;
-
-                case PlayerPosition.North: // Top - put to the RIGHT of panel
-                    containerRect.anchorMin = new Vector2(0.5f, 1);
-                    containerRect.anchorMax = new Vector2(0.5f, 1);
-                    containerRect.pivot = new Vector2(0, 0.5f);
-                    containerRect.anchoredPosition = new Vector2(85, panelRect.anchoredPosition.y - 40);
-                    break;
-
-                case PlayerPosition.East: // Right side - put UNDER the panel
-                    containerRect.anchorMin = new Vector2(1, 0.5f);
-                    containerRect.anchorMax = new Vector2(1, 0.5f);
-                    containerRect.pivot = new Vector2(0.5f, 1);
-                    containerRect.anchoredPosition = new Vector2(panelRect.anchoredPosition.x, panelRect.anchoredPosition.y - 60);
-                    break;
-
-                case PlayerPosition.West: // Left side - put UNDER the panel
-                    containerRect.anchorMin = new Vector2(0, 0.5f);
-                    containerRect.anchorMax = new Vector2(0, 0.5f);
-                    containerRect.pivot = new Vector2(0.5f, 1);
-                    containerRect.anchoredPosition = new Vector2(panelRect.anchoredPosition.x, panelRect.anchoredPosition.y - 60);
-                    break;
-            }
-
-            containerRect.sizeDelta = new Vector2(120, 50);
+            // Center horizontally in the panel, positioned at the bottom area
+            containerRect.anchorMin = new Vector2(0.5f, 0f);
+            containerRect.anchorMax = new Vector2(0.5f, 0f);
+            containerRect.pivot = new Vector2(0.5f, 1f);
+            containerRect.anchoredPosition = new Vector2(0, -2);
+            containerRect.sizeDelta = new Vector2(110, 40);
 
             // Add canvas to ensure it renders on top
             Canvas containerCanvas = specialCardsContainer.AddComponent<Canvas>();
@@ -592,7 +565,7 @@ namespace Lekha.UI
             iconObj.transform.SetParent(parent, false);
 
             RectTransform iconRect = iconObj.AddComponent<RectTransform>();
-            iconRect.sizeDelta = new Vector2(48, 48); // BIGGER!
+            iconRect.sizeDelta = new Vector2(36, 36);
 
             // Background with glass effect
             Image bg = iconObj.AddComponent<Image>();
@@ -624,7 +597,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
             tmp.text = label;
-            tmp.fontSize = 22; // BIGGER font
+            tmp.fontSize = 16;
             tmp.fontStyle = FontStyles.Bold;
             tmp.color = Color.white;
             tmp.alignment = TextAlignmentOptions.Center;
@@ -633,10 +606,10 @@ namespace Lekha.UI
 
             // Add layout element for proper sizing
             LayoutElement layoutElem = iconObj.AddComponent<LayoutElement>();
-            layoutElem.preferredWidth = 48;
-            layoutElem.preferredHeight = 48;
-            layoutElem.minWidth = 48;
-            layoutElem.minHeight = 48;
+            layoutElem.preferredWidth = 36;
+            layoutElem.preferredHeight = 36;
+            layoutElem.minWidth = 36;
+            layoutElem.minHeight = 36;
 
             return bg;
         }
@@ -942,32 +915,107 @@ namespace Lekha.UI
         {
             if (player == null) return;
 
-            // Update round points
-            if (roundPointsText != null)
-            {
-                roundPointsText.text = player.RoundPoints.ToString();
+            int targetRound = player.RoundPoints;
+            int targetTotal = player.TotalPoints;
 
-                // Color based on round points danger
-                if (player.RoundPoints >= 20)
-                    roundPointsText.color = ModernUITheme.Danger;
-                else if (player.RoundPoints >= 10)
-                    roundPointsText.color = ModernUITheme.Warning;
-                else
-                    roundPointsText.color = TextGold;
+            // Animate round points if changed
+            if (roundPointsText != null && targetRound != displayedRoundPoints)
+            {
+                if (roundScoreCoroutine != null) StopCoroutine(roundScoreCoroutine);
+                roundScoreCoroutine = StartCoroutine(AnimateScoreCount(
+                    roundPointsText, displayedRoundPoints, targetRound, true));
+                displayedRoundPoints = targetRound;
             }
 
-            // Update total points
-            if (totalPointsText != null)
+            // Animate total points if changed
+            if (totalPointsText != null && targetTotal != displayedTotalPoints)
             {
-                totalPointsText.text = player.TotalPoints.ToString();
+                if (totalScoreCoroutine != null) StopCoroutine(totalScoreCoroutine);
+                totalScoreCoroutine = StartCoroutine(AnimateScoreCount(
+                    totalPointsText, displayedTotalPoints, targetTotal, false));
+                displayedTotalPoints = targetTotal;
+            }
+        }
 
-                // Color total based on danger threshold (101 is losing score)
-                if (player.TotalPoints >= 90)
-                    totalPointsText.color = ModernUITheme.Danger;
-                else if (player.TotalPoints >= 70)
-                    totalPointsText.color = ModernUITheme.Warning;
+        /// <summary>
+        /// Reset displayed score tracking (call at start of new round for round points)
+        /// </summary>
+        public void ResetRoundScoreDisplay()
+        {
+            displayedRoundPoints = 0;
+            if (roundPointsText != null)
+            {
+                roundPointsText.text = "0";
+                roundPointsText.color = TextGold;
+            }
+        }
+
+        private System.Collections.IEnumerator AnimateScoreCount(
+            TextMeshProUGUI text, int fromValue, int toValue, bool isRoundScore)
+        {
+            if (text == null) yield break;
+
+            float duration = 0.4f;
+            float elapsed = 0f;
+            int diff = toValue - fromValue;
+            RectTransform textRect = text.GetComponent<RectTransform>();
+            Vector3 originalScale = textRect != null ? textRect.localScale : Vector3.one;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0, 1, elapsed / duration);
+
+                // Count up the number
+                int current = fromValue + Mathf.RoundToInt(diff * t);
+                text.text = current.ToString();
+
+                // Punch scale effect - peaks at start then settles
+                if (textRect != null)
+                {
+                    float punch = Mathf.Sin(t * Mathf.PI) * 0.2f;
+                    textRect.localScale = originalScale * (1f + punch);
+                }
+
+                // Update color during animation
+                if (isRoundScore)
+                {
+                    if (current >= 20)
+                        text.color = ModernUITheme.Danger;
+                    else if (current >= 10)
+                        text.color = ModernUITheme.Warning;
+                    else
+                        text.color = TextGold;
+                }
                 else
-                    totalPointsText.color = TextWhite;
+                {
+                    if (current >= 90)
+                        text.color = ModernUITheme.Danger;
+                    else if (current >= 70)
+                        text.color = ModernUITheme.Warning;
+                    else
+                        text.color = TextWhite;
+                }
+
+                yield return null;
+            }
+
+            // Ensure final values
+            text.text = toValue.ToString();
+            if (textRect != null) textRect.localScale = originalScale;
+
+            // Final color
+            if (isRoundScore)
+            {
+                if (toValue >= 20) text.color = ModernUITheme.Danger;
+                else if (toValue >= 10) text.color = ModernUITheme.Warning;
+                else text.color = TextGold;
+            }
+            else
+            {
+                if (toValue >= 90) text.color = ModernUITheme.Danger;
+                else if (toValue >= 70) text.color = ModernUITheme.Warning;
+                else text.color = TextWhite;
             }
         }
 
