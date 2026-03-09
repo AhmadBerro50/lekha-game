@@ -19,6 +19,7 @@ namespace Lekha.Network
         private IRtcEngine rtcEngine;
         private bool isInitialized = false;
         private bool isInChannel = false;
+        private bool isJoining = false;
         private string currentChannelName;
 
         // State
@@ -129,25 +130,30 @@ namespace Lekha.Network
 
         /// <summary>
         /// Join the voice channel for the current game room.
-        /// Uses the room ID as the channel name so all players in the same room hear each other.
+        /// Uses position-based uid so we can map speakers to player panels.
+        /// South=1, East=2, North=3, West=4
         /// </summary>
-        public void JoinChannel(string roomId)
+        public void JoinChannel(string roomId, string position = null)
         {
             if (!isInitialized)
             {
                 if (!Initialize()) return;
             }
 
-            if (isInChannel)
+            // If same channel already active or being joined, skip
+            if ((isJoining || isInChannel) && currentChannelName == roomId) return;
+
+            // Different channel — leave current first
+            if (isJoining || isInChannel)
             {
-                if (currentChannelName == roomId) return;
                 LeaveChannel();
             }
 
             currentChannelName = roomId;
 
-            // Join with uid=0 (auto-assign)
-            int result = rtcEngine.JoinChannel("", roomId, "", 0);
+            uint uid = PositionToUid(position);
+            isJoining = true;
+            int result = rtcEngine.JoinChannel("", roomId, "", uid);
             if (result != 0)
             {
                 Debug.LogError($"[VoiceChatManager] JoinChannel failed: {result}");
@@ -155,8 +161,32 @@ namespace Lekha.Network
             }
             else
             {
-                Debug.Log($"[VoiceChatManager] Joining channel: {roomId}");
+                Debug.Log($"[VoiceChatManager] Joining channel: {roomId}, uid: {uid} (position: {position})");
             }
+        }
+
+        private static uint PositionToUid(string position)
+        {
+            return position switch
+            {
+                "South" => 1,
+                "East" => 2,
+                "North" => 3,
+                "West" => 4,
+                _ => 0
+            };
+        }
+
+        public static string UidToPosition(uint uid)
+        {
+            return uid switch
+            {
+                1 => "South",
+                2 => "East",
+                3 => "North",
+                4 => "West",
+                _ => null
+            };
         }
 
         /// <summary>
@@ -164,14 +194,17 @@ namespace Lekha.Network
         /// </summary>
         public void LeaveChannel()
         {
-            if (!isInChannel || rtcEngine == null) return;
+            if ((!isInChannel && !isJoining) || rtcEngine == null) return;
 
             rtcEngine.LeaveChannel();
             isInChannel = false;
+            isJoining = false;
             currentChannelName = null;
             speakingVolumes.Clear();
             uidToPlayerId.Clear();
             localSpeakingVolume = 0;
+
+            rtcEngine?.SetClientRole(CLIENT_ROLE_TYPE.CLIENT_ROLE_BROADCASTER);
 
             Debug.Log("[VoiceChatManager] Left voice channel");
             OnLeftChannel?.Invoke();
@@ -231,6 +264,7 @@ namespace Lekha.Network
         // Called by event handler
         internal void HandleJoinChannelSuccess(uint uid)
         {
+            isJoining = false;
             isInChannel = true;
             Debug.Log($"[VoiceChatManager] Joined channel successfully, uid: {uid}");
             OnJoinedChannel?.Invoke();
@@ -269,6 +303,8 @@ namespace Lekha.Network
         internal void HandleError(int err, string msg)
         {
             Debug.LogError($"[VoiceChatManager] Agora error {err}: {msg}");
+            isInChannel = false;
+            isJoining = false;
             OnVoiceChatError?.Invoke($"Error {err}: {msg}");
         }
     }

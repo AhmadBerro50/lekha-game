@@ -206,8 +206,9 @@ namespace Lekha.GameLogic
 
             if (VoiceChatManager.Instance != null)
             {
-                VoiceChatManager.Instance.JoinChannel(roomId);
-                Debug.Log($"[GameController] Joining voice channel for room: {roomId}");
+                string position = NetworkManager.Instance?.LocalPlayer?.AssignedPosition ?? "South";
+                VoiceChatManager.Instance.JoinChannel(roomId, position);
+                Debug.Log($"[GameController] Joining voice channel for room: {roomId}, position: {position}");
             }
         }
 

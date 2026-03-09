@@ -171,7 +171,7 @@ namespace Lekha.GameLogic
                     if (!cardWasInHand)
                     {
                         // Add card to hand so PlayCard can remove it
-                        player.ReceiveCards(new List<Card> { card });
+                        player.AddPassedCards(new List<Card> { card });
                         Debug.Log($"[GameManager] Added card {card} to {player.PlayerName}'s hand for play");
                     }
 

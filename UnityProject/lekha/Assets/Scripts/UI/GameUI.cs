@@ -98,8 +98,9 @@ namespace Lekha.UI
         /// </summary>
         private System.Collections.IEnumerator WatchdogCoroutine()
         {
-            const float checkInterval = 2f;
-            const float stuckThreshold = 5f; // If no action for 5 seconds, try to recover
+            const float checkInterval  = 2f;
+            const float stuckThreshold = 5f;  // Basic recovery threshold
+            const float deepStuck      = 15f; // Deep-stuck: force re-highlight / resync
 
             while (true)
             {
@@ -119,42 +120,61 @@ namespace Lekha.UI
                     continue;
                 }
 
-                // Check if we're stuck
                 float timeSinceLastAction = Time.time - lastActionTime;
-                if (timeSinceLastAction > stuckThreshold)
+                if (timeSinceLastAction <= stuckThreshold) continue;
+
+                Debug.LogWarning($"[Watchdog] Game stuck for {timeSinceLastAction:F1}s — recovering");
+
+                // Reset blocking flags
+                isProcessingPlay   = false;
+                nextAllowedPlayTime = 0f;
+
+                Player currentPlayer = GameManager.Instance.CurrentPlayer;
+                bool   isLocalTurn   = GameManager.Instance.IsLocalPlayerTurn();
+
+                if (isLocalTurn)
                 {
-                    Debug.LogWarning($"[Watchdog] Game appears stuck for {timeSinceLastAction:F1}s, attempting recovery");
-
-                    // Reset blocking flags
-                    isProcessingPlay = false;
-                    nextAllowedPlayTime = 0; // Clear the nuclear lock
-
-                    Player currentPlayer = GameManager.Instance.CurrentPlayer;
-                    // In online games, only act if it's local player's turn
-                    bool isLocalTurn = GameManager.Instance.IsLocalPlayerTurn();
-                    if (isLocalTurn)
+                    Debug.Log("[Watchdog] Highlighting cards for local player");
+                    HighlightPlayableCards();
+                }
+                else if (!GameManager.Instance.IsOnlineGame && !currentPlayer.IsHuman)
+                {
+                    Debug.Log($"[Watchdog] Triggering AI for {currentPlayer.PlayerName}");
+                    AIPlayCard();
+                }
+                else if (GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
+                {
+                    Debug.Log($"[Watchdog] HOST AI for disconnected {currentPlayer.PlayerName}");
+                    AIPlayCard();
+                }
+                else if (GameManager.Instance.IsOnlineGame && timeSinceLastAction > deepStuck)
+                {
+                    // Deep-stuck in online game waiting for a remote player.
+                    // Re-fire OnTrickStarted-equivalent to re-schedule the remote wait.
+                    Debug.LogWarning($"[Watchdog] Deep stuck {timeSinceLastAction:F1}s — re-triggering turn setup for {currentPlayer.PlayerName}");
+                    // Force re-highlight for local player or re-trigger AI if bot
+                    if (NetworkGameSync.Instance?.IsHost == true &&
+                        GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
                     {
-                        Debug.Log("[Watchdog] Highlighting cards for local player");
+                        AIPlayCard();
+                    }
+                    else if (isLocalTurn)
+                    {
                         HighlightPlayableCards();
-                    }
-                    else if (!GameManager.Instance.IsOnlineGame && !currentPlayer.IsHuman)
-                    {
-                        // Only trigger AI in local games for non-human players
-                        Debug.Log($"[Watchdog] Triggering AI play for {currentPlayer.PlayerName}");
-                        AIPlayCard();
-                    }
-                    else if (GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
-                    {
-                        Debug.Log($"[Watchdog] HOST triggering AI for disconnected {currentPlayer.PlayerName}");
-                        AIPlayCard();
                     }
                     else
                     {
-                        Debug.Log($"[Watchdog] Waiting for remote player {currentPlayer.PlayerName}");
+                        // Nothing we can do; update instruction text so player knows we're waiting
+                        if (instructionText != null)
+                            instructionText.text = $"Waiting for {currentPlayer.PlayerName}...";
                     }
-
-                    lastActionTime = Time.time;
                 }
+                else
+                {
+                    Debug.Log($"[Watchdog] Online — waiting for remote player {currentPlayer.PlayerName}");
+                }
+
+                lastActionTime = Time.time;
             }
         }
 
@@ -680,7 +700,7 @@ namespace Lekha.UI
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
             panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(200, 220);
+            panelRect.sizeDelta = new Vector2(230, 400);
             panelRect.anchoredPosition = Vector2.zero;
 
             emojiPanelCanvasGroup = emojiPanelObj.AddComponent<CanvasGroup>();
@@ -707,12 +727,12 @@ namespace Lekha.UI
             layoutRect.anchoredPosition = Vector2.zero;
 
             GridLayoutGroup layout = layoutObj.AddComponent<GridLayoutGroup>();
-            layout.cellSize = new Vector2(50, 50);
-            layout.spacing = new Vector2(6, 6);
+            layout.cellSize = new Vector2(60, 60);
+            layout.spacing = new Vector2(8, 8);
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             layout.constraintCount = 3;
-            layout.padding = new RectOffset(8, 8, 8, 8);
+            layout.padding = new RectOffset(10, 10, 10, 10);
 
             // Create emoji buttons
             var reactions = new (string name, Color color)[]
@@ -725,7 +745,13 @@ namespace Lekha.UI
                 ("fire", new Color(1f, 0.5f, 0.2f)),
                 ("heart_broken", new Color(0.9f, 0.4f, 0.6f)),
                 ("party", new Color(0.7f, 0.4f, 0.95f)),
-                ("thumbsup", new Color(0.3f, 0.7f, 1f))
+                ("thumbsup", new Color(0.3f, 0.7f, 1f)),
+                ("wow", new Color(1f, 0.85f, 0.2f)),
+                ("love", new Color(0.95f, 0.3f, 0.5f)),
+                ("cry", new Color(0.4f, 0.6f, 0.95f)),
+                ("skull", new Color(0.7f, 0.7f, 0.75f)),
+                ("pray", new Color(0.95f, 0.75f, 0.5f)),
+                ("rocket", new Color(0.4f, 0.5f, 1f))
             };
 
             foreach (var reaction in reactions)
@@ -743,7 +769,7 @@ namespace Lekha.UI
             btnObj.transform.SetParent(parent, false);
 
             RectTransform btnRect = btnObj.AddComponent<RectTransform>();
-            btnRect.sizeDelta = new Vector2(50, 50);
+            btnRect.sizeDelta = new Vector2(60, 60);
 
             // Background with accent color
             Image bg = btnObj.AddComponent<Image>();

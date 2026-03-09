@@ -1010,7 +1010,7 @@ namespace Lekha.UI
             // Update name
             if (profileNameText != null)
             {
-                profileNameText.text = profile.DisplayName.ToUpper();
+                profileNameText.text = (profile.DisplayName ?? "PLAYER").ToUpper();
             }
 
             // Update avatar

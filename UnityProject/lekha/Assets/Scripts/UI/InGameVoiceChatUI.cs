@@ -8,6 +8,7 @@ namespace Lekha.UI
     /// <summary>
     /// In-game voice chat UI overlay.
     /// Shows circular mic/speaker controls during online gameplay.
+    /// Modern pill design with Unicode icons.
     /// </summary>
     public class InGameVoiceChatUI : MonoBehaviour
     {
@@ -18,21 +19,33 @@ namespace Lekha.UI
         private Button micButton;
         private Button speakerButton;
         private TextMeshProUGUI micIconText;
+        private TextMeshProUGUI micLabelText;
         private TextMeshProUGUI speakerIconText;
+        private TextMeshProUGUI speakerLabelText;
         private Image micButtonBg;
         private Image speakerButtonBg;
-        private Outline micOutline;
-        private Outline speakerOutline;
+        private Image micRing;
+        private Image speakerRing;
+
+        // Speaking pulse animation
+        private float micPulseTime = 0f;
+        private bool isMicSpeaking = false;
 
         // Colors
-        private static readonly Color MicActiveColor = new Color(0.2f, 0.75f, 0.4f, 1f);
-        private static readonly Color MicMutedColor = new Color(0.85f, 0.25f, 0.25f, 1f);
-        private static readonly Color SpeakerActiveColor = new Color(0.3f, 0.55f, 0.9f, 1f);
-        private static readonly Color SpeakerMutedColor = new Color(0.85f, 0.25f, 0.25f, 1f);
-        private static readonly Color ButtonBgDark = new Color(0.1f, 0.12f, 0.18f, 0.9f);
+        private static readonly Color ActiveGreen   = new Color(0.20f, 0.80f, 0.45f, 1f);
+        private static readonly Color MutedRed       = new Color(0.90f, 0.25f, 0.25f, 1f);
+        private static readonly Color SpeakerBlue    = new Color(0.35f, 0.65f, 1.00f, 1f);
+        private static readonly Color SpeakerMuted   = new Color(0.90f, 0.25f, 0.25f, 1f);
+        private static readonly Color BgDark         = new Color(0.08f, 0.09f, 0.14f, 0.92f);
+        private static readonly Color BgMuted        = new Color(0.22f, 0.06f, 0.06f, 0.92f);
+
+        // Unicode icons
+        private const string IconMicOn   = "\u25CF";   // filled circle = active mic indicator
+        private const string IconMicOff  = "\u2715";   // × = muted
+        private const string IconSpkOn   = "\u25B6";   // ▶ play-like = sound on
+        private const string IconSpkOff  = "\u2715";   // × = muted
 
         private bool isVisible = false;
-        private Sprite circleSprite;
 
         private void Awake()
         {
@@ -42,9 +55,6 @@ namespace Lekha.UI
                 return;
             }
             Instance = this;
-
-            // Create UI in Awake so Show() works immediately after AddComponent
-            circleSprite = CreateCircleSprite(64);
             CreateUI();
             Debug.Log("[InGameVoiceChatUI] UI built in Awake, ready for Show()");
         }
@@ -54,7 +64,26 @@ namespace Lekha.UI
             if (VoiceChatManager.Instance != null)
             {
                 VoiceChatManager.Instance.OnMicrophoneMuteChanged += OnMicMuteChanged;
-                VoiceChatManager.Instance.OnSpeakerMuteChanged += OnSpeakerMuteChanged;
+                VoiceChatManager.Instance.OnSpeakerMuteChanged    += OnSpeakerMuteChanged;
+                VoiceChatManager.Instance.OnPlayerSpeaking        += OnPlayerSpeaking;
+            }
+        }
+
+        private void Update()
+        {
+            // Animate mic ring pulse when speaking
+            if (isMicSpeaking && micRing != null)
+            {
+                micPulseTime += Time.deltaTime * 4f;
+                float scale = 1f + Mathf.Sin(micPulseTime) * 0.12f;
+                micRing.transform.localScale = Vector3.one * scale;
+                micRing.color = new Color(ActiveGreen.r, ActiveGreen.g, ActiveGreen.b,
+                    0.4f + Mathf.Sin(micPulseTime) * 0.3f);
+            }
+            else if (micRing != null)
+            {
+                micRing.transform.localScale = Vector3.one;
+                micRing.color = new Color(0.3f, 0.8f, 0.5f, 0.15f);
             }
         }
 
@@ -63,12 +92,13 @@ namespace Lekha.UI
             if (VoiceChatManager.Instance != null)
             {
                 VoiceChatManager.Instance.OnMicrophoneMuteChanged -= OnMicMuteChanged;
-                VoiceChatManager.Instance.OnSpeakerMuteChanged -= OnSpeakerMuteChanged;
+                VoiceChatManager.Instance.OnSpeakerMuteChanged    -= OnSpeakerMuteChanged;
+                VoiceChatManager.Instance.OnPlayerSpeaking        -= OnPlayerSpeaking;
             }
-
-            if (Instance == this)
-                Instance = null;
+            if (Instance == this) Instance = null;
         }
+
+        // ─── UI Construction ──────────────────────────────────────────────────
 
         private void CreateUI()
         {
@@ -76,172 +106,226 @@ namespace Lekha.UI
             rootPanel.transform.SetParent(transform, false);
 
             Canvas canvas = rootPanel.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.renderMode  = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 90;
 
             CanvasScaler scaler = rootPanel.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.uiScaleMode        = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1080, 1920);
-            scaler.matchWidthOrHeight = 0.5f;
+            scaler.matchWidthOrHeight  = 0.5f;
 
             rootPanel.AddComponent<GraphicRaycaster>();
 
-            // Mic button - bottom left, above the card hand
-            GameObject micObj = CreateCircularButton(rootPanel.transform, "MicButton", new Vector2(80, 180), 70f);
-            micButton = micObj.GetComponent<Button>();
-            micButtonBg = micObj.GetComponent<Image>();
-            micIconText = micObj.GetComponentInChildren<TextMeshProUGUI>();
-            micOutline = micObj.GetComponent<Outline>();
-            micButton.onClick.AddListener(OnMicButtonClicked);
+            Sprite circle = MakeCircleSprite(64);
 
-            // Speaker button - next to mic
-            GameObject speakerObj = CreateCircularButton(rootPanel.transform, "SpeakerButton", new Vector2(170, 180), 70f);
-            speakerButton = speakerObj.GetComponent<Button>();
-            speakerButtonBg = speakerObj.GetComponent<Image>();
-            speakerIconText = speakerObj.GetComponentInChildren<TextMeshProUGUI>();
-            speakerOutline = speakerObj.GetComponent<Outline>();
-            speakerButton.onClick.AddListener(OnSpeakerButtonClicked);
+            // Mic button – bottom left, above hand area
+            micButton = CreateButton(rootPanel.transform, "MicButton",
+                new Vector2(68f, 190f), 64f, circle, out micButtonBg, out micRing,
+                out micIconText, out micLabelText, "MIC");
+            micButton.onClick.AddListener(OnMicClicked);
+
+            // Speaker button – next to mic
+            speakerButton = CreateButton(rootPanel.transform, "SpeakerButton",
+                new Vector2(152f, 190f), 64f, circle, out speakerButtonBg, out Image _ring,
+                out speakerIconText, out speakerLabelText, "SPK");
+            speakerButton.onClick.AddListener(OnSpeakerClicked);
 
             UpdateButtonStates();
-
-            // Hidden by default
             rootPanel.SetActive(false);
         }
 
-        private GameObject CreateCircularButton(Transform parent, string name, Vector2 position, float size)
+        private Button CreateButton(Transform parent, string name, Vector2 anchoredPos, float size,
+            Sprite circleSprite,
+            out Image bg, out Image ring,
+            out TextMeshProUGUI iconText, out TextMeshProUGUI labelText,
+            string labelStr)
         {
-            GameObject btnObj = new GameObject(name);
-            btnObj.transform.SetParent(parent, false);
+            // Container
+            GameObject obj = new GameObject(name);
+            obj.transform.SetParent(parent, false);
 
-            RectTransform rect = btnObj.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0, 0);
-            rect.anchorMax = new Vector2(0, 0);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(size, size);
+            RectTransform rect = obj.AddComponent<RectTransform>();
+            rect.anchorMin        = new Vector2(0, 0);
+            rect.anchorMax        = new Vector2(0, 0);
+            rect.pivot            = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPos;
+            rect.sizeDelta        = new Vector2(size, size);
 
-            Image bg = btnObj.AddComponent<Image>();
+            // Outer glow ring (animates when speaking)
+            GameObject ringObj = new GameObject("Ring");
+            ringObj.transform.SetParent(obj.transform, false);
+            RectTransform ringRect = ringObj.AddComponent<RectTransform>();
+            ringRect.anchorMin = new Vector2(-0.15f, -0.15f);
+            ringRect.anchorMax = new Vector2(1.15f, 1.15f);
+            ringRect.sizeDelta = Vector2.zero;
+            ring = ringObj.AddComponent<Image>();
+            ring.sprite         = circleSprite;
+            ring.color          = new Color(0.3f, 0.8f, 0.5f, 0.15f);
+            ring.raycastTarget  = false;
+
+            // Background circle
+            bg = obj.AddComponent<Image>();
             bg.sprite = circleSprite;
-            bg.type = Image.Type.Simple;
-            bg.color = ButtonBgDark;
+            bg.color  = BgDark;
 
-            Outline outline = btnObj.AddComponent<Outline>();
-            outline.effectColor = MicActiveColor;
-            outline.effectDistance = new Vector2(2, -2);
+            // Subtle border
+            Outline outline = obj.AddComponent<Outline>();
+            outline.effectColor    = new Color(0.4f, 0.7f, 1f, 0.35f);
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
 
-            Button btn = btnObj.AddComponent<Button>();
+            // Button
+            Button btn = obj.AddComponent<Button>();
             btn.targetGraphic = bg;
 
             ColorBlock colors = btn.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1, 1, 1, 0.9f);
-            colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
-            btn.colors = colors;
+            colors.normalColor      = Color.white;
+            colors.highlightedColor = new Color(1.1f, 1.1f, 1.1f, 1f);
+            colors.pressedColor     = new Color(0.75f, 0.75f, 0.75f, 1f);
+            btn.colors              = colors;
 
+            // Main icon (large, centered)
             GameObject iconObj = new GameObject("Icon");
-            iconObj.transform.SetParent(btnObj.transform, false);
-
+            iconObj.transform.SetParent(obj.transform, false);
             RectTransform iconRect = iconObj.AddComponent<RectTransform>();
-            iconRect.anchorMin = Vector2.zero;
-            iconRect.anchorMax = Vector2.one;
-            iconRect.offsetMin = Vector2.zero;
-            iconRect.offsetMax = Vector2.zero;
+            iconRect.anchorMin        = new Vector2(0.5f, 0.55f);
+            iconRect.anchorMax        = new Vector2(0.5f, 0.55f);
+            iconRect.pivot            = new Vector2(0.5f, 0.5f);
+            iconRect.anchoredPosition = Vector2.zero;
+            iconRect.sizeDelta        = new Vector2(size, size * 0.45f);
 
-            TextMeshProUGUI text = iconObj.AddComponent<TextMeshProUGUI>();
-            text.text = "MIC";
-            text.fontSize = 20;
-            text.fontStyle = FontStyles.Bold;
-            text.alignment = TextAlignmentOptions.Center;
-            text.color = Color.white;
-            text.raycastTarget = false;
+            iconText              = iconObj.AddComponent<TextMeshProUGUI>();
+            iconText.text         = IconMicOn;
+            iconText.fontSize     = 22f;
+            iconText.fontStyle    = FontStyles.Bold;
+            iconText.alignment    = TextAlignmentOptions.Center;
+            iconText.color        = ActiveGreen;
+            iconText.raycastTarget = false;
 
-            return btnObj;
+            // Label under icon
+            GameObject labelObj = new GameObject("Label");
+            labelObj.transform.SetParent(obj.transform, false);
+            RectTransform labelRect = labelObj.AddComponent<RectTransform>();
+            labelRect.anchorMin        = new Vector2(0.5f, 0.1f);
+            labelRect.anchorMax        = new Vector2(0.5f, 0.1f);
+            labelRect.pivot            = new Vector2(0.5f, 0.5f);
+            labelRect.anchoredPosition = Vector2.zero;
+            labelRect.sizeDelta        = new Vector2(size, size * 0.35f);
+
+            labelText              = labelObj.AddComponent<TextMeshProUGUI>();
+            labelText.text         = labelStr;
+            labelText.fontSize     = 10f;
+            labelText.fontStyle    = FontStyles.Bold;
+            labelText.alignment    = TextAlignmentOptions.Center;
+            labelText.color        = new Color(1f, 1f, 1f, 0.65f);
+            labelText.raycastTarget = false;
+
+            return btn;
         }
 
-        private Sprite CreateCircleSprite(int size)
-        {
-            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            float center = size / 2f;
-            float radius = size / 2f - 1f;
+        // ─── Event Handlers ───────────────────────────────────────────────────
 
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
-                    if (dist <= radius)
-                    {
-                        float alpha = Mathf.Clamp01((radius - dist) / 1.5f);
-                        tex.SetPixel(x, y, new Color(1, 1, 1, alpha));
-                    }
-                    else
-                    {
-                        tex.SetPixel(x, y, Color.clear);
-                    }
-                }
-            }
-
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
-        }
-
-        private void OnMicButtonClicked()
+        private void OnMicClicked()
         {
             if (VoiceChatManager.Instance != null)
                 VoiceChatManager.Instance.SetMicrophoneMuted(!VoiceChatManager.Instance.IsMicrophoneMuted);
         }
 
-        private void OnSpeakerButtonClicked()
+        private void OnSpeakerClicked()
         {
             if (VoiceChatManager.Instance != null)
                 VoiceChatManager.Instance.SetSpeakerMuted(!VoiceChatManager.Instance.IsSpeakerMuted);
         }
 
-        private void OnMicMuteChanged(bool muted) => UpdateButtonStates();
+        private void OnMicMuteChanged(bool muted)     => UpdateButtonStates();
         private void OnSpeakerMuteChanged(bool muted) => UpdateButtonStates();
+
+        private void OnPlayerSpeaking(uint uid, bool speaking)
+        {
+            // uid 0 means local user (Agora convention)
+            if (uid == 0 || uid == 1) // local user in Agora is uid 0 or position-based uid 1 (South)
+            {
+                isMicSpeaking = speaking && !(VoiceChatManager.Instance?.IsMicrophoneMuted ?? true);
+            }
+        }
 
         private void UpdateButtonStates()
         {
             bool micMuted = VoiceChatManager.Instance?.IsMicrophoneMuted ?? false;
-            bool spkMuted = VoiceChatManager.Instance?.IsSpeakerMuted ?? false;
+            bool spkMuted = VoiceChatManager.Instance?.IsSpeakerMuted    ?? false;
 
-            Color micColor = micMuted ? MicMutedColor : MicActiveColor;
+            // --- Mic button ---
             if (micButtonBg != null)
-                micButtonBg.color = micMuted ? new Color(0.25f, 0.08f, 0.08f, 0.9f) : ButtonBgDark;
-            if (micOutline != null)
-                micOutline.effectColor = new Color(micColor.r, micColor.g, micColor.b, 0.6f);
+                micButtonBg.color = micMuted ? BgMuted : BgDark;
+
             if (micIconText != null)
             {
-                micIconText.text = micMuted ? "X" : "MIC";
-                micIconText.color = micColor;
+                micIconText.text  = micMuted ? IconMicOff : IconMicOn;
+                micIconText.color = micMuted ? MutedRed   : ActiveGreen;
             }
 
-            Color spkColor = spkMuted ? SpeakerMutedColor : SpeakerActiveColor;
+            if (micLabelText != null)
+            {
+                micLabelText.text  = micMuted ? "MUTED" : "MIC";
+                micLabelText.color = micMuted
+                    ? new Color(MutedRed.r, MutedRed.g, MutedRed.b, 0.75f)
+                    : new Color(1f, 1f, 1f, 0.65f);
+            }
+
+            // --- Speaker button ---
             if (speakerButtonBg != null)
-                speakerButtonBg.color = spkMuted ? new Color(0.25f, 0.08f, 0.08f, 0.9f) : ButtonBgDark;
-            if (speakerOutline != null)
-                speakerOutline.effectColor = new Color(spkColor.r, spkColor.g, spkColor.b, 0.6f);
+                speakerButtonBg.color = spkMuted ? BgMuted : BgDark;
+
             if (speakerIconText != null)
             {
-                speakerIconText.text = spkMuted ? "X" : "SPK";
-                speakerIconText.color = spkColor;
+                speakerIconText.text  = spkMuted ? IconSpkOff : IconSpkOn;
+                speakerIconText.color = spkMuted ? SpeakerMuted : SpeakerBlue;
+            }
+
+            if (speakerLabelText != null)
+            {
+                speakerLabelText.text  = spkMuted ? "MUTED" : "SPK";
+                speakerLabelText.color = spkMuted
+                    ? new Color(SpeakerMuted.r, SpeakerMuted.g, SpeakerMuted.b, 0.75f)
+                    : new Color(1f, 1f, 1f, 0.65f);
             }
         }
 
+        // ─── Public API ───────────────────────────────────────────────────────
+
         public void Show()
         {
-            if (rootPanel != null)
-                rootPanel.SetActive(true);
+            if (rootPanel != null) rootPanel.SetActive(true);
             isVisible = true;
             UpdateButtonStates();
-            Debug.Log("[InGameVoiceChatUI] Show() called - buttons visible");
+            Debug.Log("[InGameVoiceChatUI] Show() called");
         }
 
         public void Hide()
         {
-            if (rootPanel != null)
-                rootPanel.SetActive(false);
+            if (rootPanel != null) rootPanel.SetActive(false);
             isVisible = false;
+        }
+
+        // ─── Helpers ─────────────────────────────────────────────────────────
+
+        private static Sprite MakeCircleSprite(int size)
+        {
+            Texture2D tex    = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float     center = size / 2f;
+            float     radius = size / 2f - 1f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist  = Vector2.Distance(new Vector2(x, y), new Vector2(center, center));
+                    float alpha = dist <= radius ? Mathf.Clamp01((radius - dist) / 1.5f) : 0f;
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
         }
     }
 }
