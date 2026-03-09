@@ -55,18 +55,18 @@ namespace Lekha.UI
         // State
         private bool isTurnActive = false;
 
-        // Modern 2026 Theme Colors
-        private static readonly Color PanelBg = new Color(0.10f, 0.12f, 0.18f, 0.92f);
-        private static readonly Color AccentCyan = new Color(0.40f, 0.75f, 1f, 1f);
-        private static readonly Color AccentBright = new Color(0.50f, 0.85f, 1f, 1f);
-        private static readonly Color TextWhite = new Color(1f, 1f, 1f, 1f);
-        private static readonly Color TextCyan = new Color(0.40f, 0.85f, 1f, 1f);
-        private static readonly Color GlassBorder = new Color(1f, 1f, 1f, 0.18f);
+        // Casino felt theme colors
+        private static readonly Color PanelBg    = new Color(0.07f, 0.14f, 0.09f, 0.93f); // Dark felt green
+        private static readonly Color AccentCyan  = new Color(0.95f, 0.82f, 0.35f, 1f);    // Casino gold
+        private static readonly Color AccentBright = new Color(1f,  0.90f, 0.50f, 1f);
+        private static readonly Color TextWhite   = new Color(1f,   1f,   1f,   1f);
+        private static readonly Color TextCyan    = new Color(0.95f, 0.85f, 0.45f, 1f);    // Gold text
+        private static readonly Color GlassBorder = new Color(1f, 1f, 1f, 0.15f);
 
         // Legacy aliases
-        private static readonly Color GoldTrim = AccentCyan;
+        private static readonly Color GoldTrim  = AccentCyan;
         private static readonly Color GoldBright = AccentBright;
-        private static readonly Color TextGold = TextCyan;
+        private static readonly Color TextGold   = TextCyan;
 
         public static PlayerInfoPanel Create(Transform parent, Player player, PlayerPosition serverPosition, PlayerPosition visualPos)
         {
@@ -96,7 +96,7 @@ namespace Lekha.UI
             canvasGroup = gameObject.AddComponent<CanvasGroup>();
 
             // Panel size - LARGE with prominent avatar and both scores
-            Vector2 panelSize = new Vector2(210, 115);
+            Vector2 panelSize = new Vector2(230, 125);
             panelRect.sizeDelta = panelSize;
 
             // Turn glow (behind everything)
@@ -308,24 +308,36 @@ namespace Lekha.UI
 
         private void LoadCustomAvatar()
         {
-            // Only load custom avatar for human player (South position)
-            if (!player.IsHuman || position != PlayerPosition.South)
-                return;
-
-            var profile = PlayerProfileManager.Instance?.CurrentProfile;
-            if (profile == null)
-                return;
-
-            Sprite avatarSprite = profile.GetAvatarSprite();
-            if (avatarSprite != null)
+            // For the human player, check profile first
+            if (player.IsHuman && position == PlayerPosition.South)
             {
-                SetCustomAvatar(avatarSprite, profile.DisplayName);
+                var profile = PlayerProfileManager.Instance?.CurrentProfile;
+                if (profile != null)
+                {
+                    Sprite avatarSprite = profile.GetAvatarSprite();
+                    if (avatarSprite != null)
+                    {
+                        SetCustomAvatar(avatarSprite, profile.DisplayName);
+                        return;
+                    }
+                }
             }
-            else
+
+            // Load DiceBear pixel-art avatar for every player
+            string seed = System.Uri.EscapeDataString(player.PlayerName);
+            string url = $"https://api.dicebear.com/8.x/pixel-art/png?seed={seed}&size=128";
+
+            WebResourceLoader.Instance.LoadSprite(url, $"avatar_{player.PlayerName}", null, sprite =>
             {
-                // Use profile name for initial
-                SetPlaceholderAvatar(profile.DisplayName);
-            }
+                if (sprite != null && avatarImage != null)
+                {
+                    avatarImage.sprite = sprite;
+                    avatarImage.gameObject.SetActive(true);
+                    if (avatarText != null) avatarText.gameObject.SetActive(false);
+                    if (avatarBg  != null) avatarBg.gameObject.SetActive(false);
+                }
+                // If download fails, placeholder initial stays visible
+            });
         }
 
         /// <summary>
@@ -1104,7 +1116,20 @@ namespace Lekha.UI
             shadow.effectColor = new Color(0, 0, 0, 0.6f);
             shadow.effectDistance = new Vector2(2, -2);
 
-            // Emoji sprite image
+            // Unicode text fallback (visible until CDN image arrives)
+            GameObject emojiTextObj = new GameObject("EmojiText");
+            emojiTextObj.transform.SetParent(currentEmojiDisplay.transform, false);
+            RectTransform emojiTextRect = emojiTextObj.AddComponent<RectTransform>();
+            emojiTextRect.anchorMin = Vector2.zero;
+            emojiTextRect.anchorMax = Vector2.one;
+            emojiTextRect.sizeDelta = Vector2.zero;
+            TextMeshProUGUI emojiText = emojiTextObj.AddComponent<TextMeshProUGUI>();
+            emojiText.text = EmojiWebLoader.GetLabel(emoji);
+            emojiText.fontSize = 32f;
+            emojiText.alignment = TextAlignmentOptions.Center;
+            emojiText.raycastTarget = false;
+
+            // Emoji sprite image (rendered above text so it covers the fallback once loaded)
             GameObject spriteObj = new GameObject("EmojiSprite");
             spriteObj.transform.SetParent(currentEmojiDisplay.transform, false);
 
@@ -1115,9 +1140,12 @@ namespace Lekha.UI
             spriteRect.anchoredPosition = Vector2.zero;
 
             Image emojiImage = spriteObj.AddComponent<Image>();
-            emojiImage.sprite = EmojiReactionSystem.GetEmojiSprite(emoji);
             emojiImage.preserveAspect = true;
             emojiImage.raycastTarget = false;
+            emojiImage.gameObject.SetActive(false); // Hidden until CDN loads
+
+            // Kick off CDN download — image will show when ready
+            EmojiWebLoader.LoadInto(emoji, emojiImage);
 
             // Canvas group for fade
             CanvasGroup canvasGroup = currentEmojiDisplay.AddComponent<CanvasGroup>();

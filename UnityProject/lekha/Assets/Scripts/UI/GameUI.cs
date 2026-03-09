@@ -795,9 +795,25 @@ namespace Lekha.UI
             spriteRect.anchoredPosition = Vector2.zero;
 
             Image emojiImage = spriteObj.AddComponent<Image>();
-            emojiImage.sprite = EmojiReactionSystem.GetEmojiSprite(emojiName);
             emojiImage.preserveAspect = true;
             emojiImage.raycastTarget = false;
+            emojiImage.gameObject.SetActive(false); // Hidden until CDN loads
+
+            // Unicode fallback label (shown while image downloads or if it fails)
+            GameObject fallbackObj = new GameObject("EmojiFallback");
+            fallbackObj.transform.SetParent(btnObj.transform, false);
+            RectTransform fallbackRect = fallbackObj.AddComponent<RectTransform>();
+            fallbackRect.anchorMin = Vector2.zero;
+            fallbackRect.anchorMax = Vector2.one;
+            fallbackRect.sizeDelta = Vector2.zero;
+            TextMeshProUGUI fallbackText = fallbackObj.AddComponent<TextMeshProUGUI>();
+            fallbackText.text = EmojiWebLoader.GetLabel(emojiName);
+            fallbackText.fontSize = 26f;
+            fallbackText.alignment = TextAlignmentOptions.Center;
+            fallbackText.raycastTarget = false;
+
+            // Kick off CDN download
+            EmojiWebLoader.LoadInto(emojiName, emojiImage);
 
             // Button
             Button btn = btnObj.AddComponent<Button>();
@@ -902,33 +918,138 @@ namespace Lekha.UI
 
         private void CreateBackground(Transform parent)
         {
-            // Elegant gradient background - deep purple to dark teal
-
-            // Base layer - modern deep navy to purple gradient
-            GameObject baseBg = new GameObject("BaseBackground");
+            // ── Layer 1: Deep mahogany room background ──────────────────────────
+            GameObject baseBg = new GameObject("RoomBackground");
             baseBg.transform.SetParent(parent, false);
             Image baseImg = baseBg.AddComponent<Image>();
-            baseImg.sprite = CreateVerticalGradientSprite(64, new Color(0.06f, 0.08f, 0.14f, 1f), new Color(0.12f, 0.08f, 0.22f, 1f));
+            // Rich dark wood / mahogany room colour
+            baseImg.sprite = CreateRadialGradientSprite(128,
+                new Color(0.18f, 0.09f, 0.05f, 1f),   // centre warm brown
+                new Color(0.07f, 0.03f, 0.01f, 1f));   // edge near-black
             RectTransform baseRect = baseBg.GetComponent<RectTransform>();
             baseRect.anchorMin = Vector2.zero;
             baseRect.anchorMax = Vector2.one;
             baseRect.sizeDelta = Vector2.zero;
             baseImg.raycastTarget = false;
 
-            // Corner vignette overlay for depth
+            // ── Layer 2: Heavy edge vignette ───────────────────────────────────
             GameObject vignetteObj = new GameObject("Vignette");
             vignetteObj.transform.SetParent(parent, false);
             Image vignetteImg = vignetteObj.AddComponent<Image>();
-            vignetteImg.sprite = CreateVignetteSprite(128);
-            vignetteImg.color = new Color(0, 0, 0, 0.4f);
+            vignetteImg.sprite = CreateVignetteSprite(256);
+            vignetteImg.color = new Color(0f, 0f, 0f, 0.65f);
             RectTransform vignetteRect = vignetteObj.GetComponent<RectTransform>();
             vignetteRect.anchorMin = Vector2.zero;
             vignetteRect.anchorMax = Vector2.one;
             vignetteRect.sizeDelta = Vector2.zero;
             vignetteImg.raycastTarget = false;
 
-            // Create modern card table
-            CreateModernTable(parent);
+            // ── Layer 3: Green felt table ──────────────────────────────────────
+            CreateFeltTable(parent);
+        }
+
+        /// <summary>
+        /// Creates an authentic casino-style green felt table with mahogany border
+        /// </summary>
+        private void CreateFeltTable(Transform parent)
+        {
+            // ── Mahogany wood border ───────────────────────────────────────────
+            GameObject woodFrame = new GameObject("WoodFrame");
+            woodFrame.transform.SetParent(parent, false);
+            RectTransform woodRect = woodFrame.AddComponent<RectTransform>();
+            woodRect.anchorMin = new Vector2(0.5f, 0.5f);
+            woodRect.anchorMax = new Vector2(0.5f, 0.5f);
+            woodRect.sizeDelta = new Vector2(1720f, 960f);
+            woodRect.anchoredPosition = new Vector2(0, 20f);
+
+            Image woodImg = woodFrame.AddComponent<Image>();
+            woodImg.sprite = CreateRoundedRectSprite(128, 72, 36);
+            woodImg.type = Image.Type.Sliced;
+            woodImg.color = new Color(0.28f, 0.12f, 0.04f, 1f); // Mahogany
+            woodImg.raycastTarget = false;
+
+            // Drop shadow under the whole table
+            Shadow woodShadow = woodFrame.AddComponent<Shadow>();
+            woodShadow.effectColor = new Color(0f, 0f, 0f, 0.7f);
+            woodShadow.effectDistance = new Vector2(0f, -8f);
+
+            // ── Felt rail (dark green inner border) ───────────────────────────
+            GameObject railObj = new GameObject("FeltRail");
+            railObj.transform.SetParent(parent, false);
+            RectTransform railRect = railObj.AddComponent<RectTransform>();
+            railRect.anchorMin = new Vector2(0.5f, 0.5f);
+            railRect.anchorMax = new Vector2(0.5f, 0.5f);
+            railRect.sizeDelta = new Vector2(1660f, 900f);
+            railRect.anchoredPosition = new Vector2(0, 20f);
+
+            Image railImg = railObj.AddComponent<Image>();
+            railImg.sprite = CreateRoundedRectSprite(128, 68, 32);
+            railImg.type = Image.Type.Sliced;
+            railImg.color = new Color(0.05f, 0.22f, 0.10f, 1f); // Deep felt rail
+            railImg.raycastTarget = false;
+
+            // ── Main felt surface ─────────────────────────────────────────────
+            GameObject feltObj = new GameObject("FeltSurface");
+            feltObj.transform.SetParent(parent, false);
+            RectTransform feltRect = feltObj.AddComponent<RectTransform>();
+            feltRect.anchorMin = new Vector2(0.5f, 0.5f);
+            feltRect.anchorMax = new Vector2(0.5f, 0.5f);
+            feltRect.sizeDelta = new Vector2(1580f, 840f);
+            feltRect.anchoredPosition = new Vector2(0, 20f);
+
+            Image feltImg = feltObj.AddComponent<Image>();
+            feltImg.sprite = CreateRoundedRectSprite(128, 64, 28);
+            feltImg.type = Image.Type.Sliced;
+            feltImg.color = new Color(0.11f, 0.40f, 0.20f, 1f); // Casino felt green
+            feltImg.raycastTarget = false;
+
+            // ── Radial centre highlight (light source from above) ─────────────
+            GameObject centreLight = new GameObject("FeltCentreLight");
+            centreLight.transform.SetParent(parent, false);
+            RectTransform lightRect = centreLight.AddComponent<RectTransform>();
+            lightRect.anchorMin = new Vector2(0.5f, 0.5f);
+            lightRect.anchorMax = new Vector2(0.5f, 0.5f);
+            lightRect.sizeDelta = new Vector2(1200f, 700f);
+            lightRect.anchoredPosition = new Vector2(0, 60f);
+
+            Image lightImg = centreLight.AddComponent<Image>();
+            lightImg.sprite = CreateSoftGlowSprite(128);
+            lightImg.color = new Color(0.55f, 0.90f, 0.60f, 0.13f); // Soft green-white bloom
+            lightImg.raycastTarget = false;
+
+            // ── Felt edge shadow (inner vignette) ─────────────────────────────
+            GameObject feltVignette = new GameObject("FeltVignette");
+            feltVignette.transform.SetParent(parent, false);
+            RectTransform fvRect = feltVignette.AddComponent<RectTransform>();
+            fvRect.anchorMin = new Vector2(0.5f, 0.5f);
+            fvRect.anchorMax = new Vector2(0.5f, 0.5f);
+            fvRect.sizeDelta = new Vector2(1580f, 840f);
+            fvRect.anchoredPosition = new Vector2(0, 20f);
+
+            Image fvImg = feltVignette.AddComponent<Image>();
+            fvImg.sprite = CreateVignetteSprite(128);
+            fvImg.color = new Color(0f, 0.05f, 0.01f, 0.45f); // Dark inner shadow
+            fvImg.raycastTarget = false;
+        }
+
+        /// <summary>
+        /// Create a radial gradient sprite (centre → edge)
+        /// </summary>
+        private Sprite CreateRadialGradientSprite(int size, Color centre, Color edge)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            Vector2 c = new Vector2(size / 2f, size / 2f);
+            float maxD = c.magnitude;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float t = Vector2.Distance(new Vector2(x, y), c) / maxD;
+                    tex.SetPixel(x, y, Color.Lerp(centre, edge, t));
+                }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
         }
 
         /// <summary>
