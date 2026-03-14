@@ -368,8 +368,24 @@ namespace Lekha.UI
 
         private void LoadCustomAvatar()
         {
-            // For the human player, check profile first
-            if (player.IsHuman && position == PlayerPosition.South)
+            bool isOnlineGame = NetworkGameSync.Instance != null && NetworkGameSync.Instance.IsOnlineGame;
+
+            // Check if this is the LOCAL player
+            bool isLocalPlayer = false;
+            if (isOnlineGame)
+            {
+                var gm = GameManager.Instance;
+                if (gm != null && gm.LocalPlayerPosition.HasValue)
+                    isLocalPlayer = (position == gm.LocalPlayerPosition.Value);
+            }
+            else
+            {
+                // Offline: human player at South is local
+                isLocalPlayer = player.IsHuman && position == PlayerPosition.South;
+            }
+
+            // LOCAL player: load from profile
+            if (isLocalPlayer)
             {
                 var profile = PlayerProfileManager.Instance?.CurrentProfile;
                 if (profile != null)
@@ -383,13 +399,45 @@ namespace Lekha.UI
                 }
             }
 
-            // Pick a bundled avatar based on player name hash
+            // REMOTE player in online game: load from AvatarData sent over network
+            if (isOnlineGame && !isLocalPlayer)
+            {
+                var room = NetworkManager.Instance?.CurrentRoom;
+                if (room != null && room.Players != null)
+                {
+                    foreach (var np in room.Players)
+                    {
+                        if (np.Position.HasValue && np.Position.Value == position)
+                        {
+                            if (!string.IsNullOrEmpty(np.AvatarData))
+                            {
+                                try
+                                {
+                                    byte[] bytes = System.Convert.FromBase64String(np.AvatarData);
+                                    Texture2D tex = new Texture2D(2, 2);
+                                    tex.LoadImage(bytes);
+                                    Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                                    SetCustomAvatar(sprite, np.DisplayName);
+                                    return;
+                                }
+                                catch (System.Exception e)
+                                {
+                                    Debug.LogWarning($"[LoadCustomAvatar] Failed to decode avatar for {np.DisplayName}: {e.Message}");
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // FALLBACK: bundled avatar based on player name hash (AI players, or missing data)
             var sprites = GetAvatarSprites();
             int idx = GetAvatarIndex(player.PlayerName);
-            Sprite sprite = sprites[idx];
-            if (sprite != null && avatarImage != null)
+            Sprite fallback = sprites[idx];
+            if (fallback != null && avatarImage != null)
             {
-                avatarImage.sprite = sprite;
+                avatarImage.sprite = fallback;
                 avatarImage.gameObject.SetActive(true);
                 if (avatarText != null) avatarText.gameObject.SetActive(false);
                 if (avatarBg  != null) avatarBg.gameObject.SetActive(false);
