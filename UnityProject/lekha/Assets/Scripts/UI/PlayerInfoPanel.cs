@@ -1296,10 +1296,10 @@ namespace Lekha.UI
                 GameObject pBadge = new GameObject("PBadge");
                 pBadge.transform.SetParent(cardObj.transform, false);
                 RectTransform pRect = pBadge.AddComponent<RectTransform>();
-                pRect.anchorMin = new Vector2(1f, 1f);
-                pRect.anchorMax = new Vector2(1f, 1f);
-                pRect.pivot = new Vector2(1f, 1f);
-                pRect.anchoredPosition = new Vector2(4, 4);
+                pRect.anchorMin = new Vector2(0f, 1f);
+                pRect.anchorMax = new Vector2(0f, 1f);
+                pRect.pivot = new Vector2(0f, 1f);
+                pRect.anchoredPosition = new Vector2(-4, 4);
                 pRect.sizeDelta = new Vector2(20, 20);
 
                 Image pBg = pBadge.AddComponent<Image>();
