@@ -237,6 +237,7 @@ namespace Lekha.UI
                 GameManager.Instance.OnPassPhaseComplete -= OnPassPhaseComplete;
                 GameManager.Instance.OnPassCardsReceived -= OnPassCardsReceived;
                 GameManager.Instance.OnTrickStarted -= OnTrickStarted;
+                GameManager.Instance.OnAllPointsPlayed -= OnAllPointsPlayed;
             }
 
             // Unsubscribe from disconnect events
@@ -1613,6 +1614,7 @@ namespace Lekha.UI
                 GameManager.Instance.OnPassPhaseComplete += OnPassPhaseComplete;
                 GameManager.Instance.OnPassCardsReceived += OnPassCardsReceived;
                 GameManager.Instance.OnTrickStarted += OnTrickStarted;
+                GameManager.Instance.OnAllPointsPlayed += OnAllPointsPlayed;
                 Debug.Log("[GameUI] All events subscribed successfully");
 
                 // Create player info panels now that GameManager is available
@@ -3310,6 +3312,85 @@ namespace Lekha.UI
         {
             // Bot replacement should never happen now — we always wait for reconnection
             Debug.LogWarning($"[GameUI] OnBotReplacedUI called for {playerName} at {pos} — this should not happen!");
+        }
+
+        // --- All Points Played: early round end with throw animation ---
+
+        private void OnAllPointsPlayed()
+        {
+            Debug.Log("[GameUI] All points played — showing throw cards animation");
+            StartCoroutine(AnimateThrowAllCards());
+        }
+
+        private System.Collections.IEnumerator AnimateThrowAllCards()
+        {
+            // Show a message
+            if (instructionText != null)
+                instructionText.text = "All point cards played!";
+
+            yield return new WaitForSeconds(0.8f);
+
+            // Animate all hand cards flying to center of table
+            Vector2 centerPos = Vector2.zero; // Center of trick area
+
+            foreach (var cardUI in playerHandCards)
+            {
+                if (cardUI == null) continue;
+                RectTransform cardRect = cardUI.GetComponent<RectTransform>();
+                if (cardRect == null) continue;
+
+                // Fly each card to center with slight random offset and rotation
+                StartCoroutine(FlyCardToCenter(cardRect, centerPos));
+            }
+
+            yield return new WaitForSeconds(1.2f);
+
+            // Clear the hand
+            ClearPlayerHand();
+
+            // Show "Round complete" message briefly
+            if (instructionText != null)
+                instructionText.text = "Round Complete!";
+
+            yield return new WaitForSeconds(1.5f);
+        }
+
+        private System.Collections.IEnumerator FlyCardToCenter(RectTransform card, Vector2 center)
+        {
+            if (card == null) yield break;
+
+            Vector2 startPos = card.anchoredPosition;
+            float randomX = UnityEngine.Random.Range(-50f, 50f);
+            float randomY = UnityEngine.Random.Range(-30f, 30f);
+            Vector2 targetPos = center + new Vector2(randomX, randomY);
+            float startRotation = card.localEulerAngles.z;
+            float targetRotation = startRotation + UnityEngine.Random.Range(-45f, 45f);
+            float delay = UnityEngine.Random.Range(0f, 0.3f);
+
+            yield return new WaitForSeconds(delay);
+
+            float duration = 0.4f;
+            float elapsed = 0f;
+
+            Image cardImg = card.GetComponent<Image>();
+
+            while (elapsed < duration)
+            {
+                if (card == null) yield break;
+
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                float easeT = t * t * (3f - 2f * t); // Smoothstep
+
+                card.anchoredPosition = Vector2.Lerp(startPos, targetPos, easeT);
+                card.localRotation = Quaternion.Euler(0, 0, Mathf.Lerp(startRotation, targetRotation, easeT));
+                card.localScale = Vector3.Lerp(Vector3.one, Vector3.one * 0.6f, easeT);
+
+                if (cardImg != null)
+                    cardImg.color = new Color(1, 1, 1, 1f - easeT * 0.5f);
+
+                yield return null;
+            }
         }
     }
 }

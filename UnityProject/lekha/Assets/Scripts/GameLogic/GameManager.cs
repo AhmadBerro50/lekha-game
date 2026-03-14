@@ -80,6 +80,7 @@ namespace Lekha.GameLogic
         public System.Action OnPassPhaseComplete;
         public System.Action<PlayerPosition, List<Card>> OnPassCardsReceived; // fromPosition, cards
         public System.Action<Player> OnTrickStarted; // Fired when a new trick starts, with the leading player
+        public System.Action OnAllPointsPlayed; // Fired when all 15 point cards have been collected
 
         private void Awake()
         {
@@ -738,6 +739,15 @@ namespace Lekha.GameLogic
 
             tricksPlayedThisRound++;
 
+            // Check if all point cards have been collected — no reason to continue
+            if (AreAllPointsPlayed())
+            {
+                Debug.Log("[GameManager] All point cards played — ending round early");
+                OnAllPointsPlayed?.Invoke();
+                EndRound();
+                return;
+            }
+
             // Check if round is over (13 tricks)
             if (tricksPlayedThisRound >= 13)
             {
@@ -749,6 +759,28 @@ namespace Lekha.GameLogic
                 trickLeaderIndex = winnerPlayerIndex;
                 StartNewTrick();
             }
+        }
+
+        /// <summary>
+        /// Check if all 15 point cards (13 Hearts + Queen of Spades + 10 of Diamonds) have been collected
+        /// </summary>
+        private bool AreAllPointsPlayed()
+        {
+            int heartsCollected = 0;
+            bool queenTaken = false;
+            bool tenDiamondsTaken = false;
+
+            foreach (var player in players)
+            {
+                foreach (var card in player.WonCards)
+                {
+                    if (card.Suit == Suit.Hearts) heartsCollected++;
+                    if (card.IsQueenOfSpades()) queenTaken = true;
+                    if (card.Suit == Suit.Diamonds && card.Rank == Rank.Ten) tenDiamondsTaken = true;
+                }
+            }
+
+            return heartsCollected >= 13 && queenTaken && tenDiamondsTaken;
         }
 
         // Events for game over with player info
