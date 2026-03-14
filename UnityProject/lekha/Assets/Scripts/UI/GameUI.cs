@@ -3326,35 +3326,25 @@ namespace Lekha.UI
 
         private System.Collections.IEnumerator AnimateThrowAllCards()
         {
-            // Show a message
             if (instructionText != null)
                 instructionText.text = "All point cards played!";
 
-            yield return new WaitForSeconds(0.8f);
+            yield return new WaitForSeconds(0.5f);
 
-            // Animate all hand cards flying to center of table
-            Vector2 centerPos = Vector2.zero; // Center of trick area
-
-            foreach (var cardUI in playerHandCards)
+            // Animate all hand cards flying to center
+            var cardsToAnimate = new List<CardUI>(playerHandCards);
+            foreach (var cardUI in cardsToAnimate)
             {
                 if (cardUI == null) continue;
                 RectTransform cardRect = cardUI.GetComponent<RectTransform>();
                 if (cardRect == null) continue;
-
-                // Fly each card to center with slight random offset and rotation
-                StartCoroutine(FlyCardToCenter(cardRect, centerPos));
+                StartCoroutine(FlyCardToCenter(cardRect, Vector2.zero));
             }
 
-            yield return new WaitForSeconds(1.2f);
+            yield return new WaitForSeconds(0.8f);
 
-            // Clear the hand
-            ClearPlayerHand();
-
-            // Show "Round complete" message briefly
-            if (instructionText != null)
-                instructionText.text = "Round Complete!";
-
-            yield return new WaitForSeconds(1.5f);
+            // DON'T call ClearPlayerHand here — OnCardsDealt will handle it
+            // when the new round starts
         }
 
         private System.Collections.IEnumerator FlyCardToCenter(RectTransform card, Vector2 center)
