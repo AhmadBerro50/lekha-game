@@ -200,11 +200,20 @@ namespace Lekha.Network
 
         private void Update()
         {
-            // Process pending actions on main thread
-            while (pendingActions.Count > 0)
+            // Process pending actions on main thread — max 5 per frame to prevent stutter
+            int processed = 0;
+            while (pendingActions.Count > 0 && processed < 5)
             {
                 var action = pendingActions.Dequeue();
-                action?.Invoke();
+                try
+                {
+                    action?.Invoke();
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[NetworkGameSync] Error in pending action: {e.Message}\n{e.StackTrace}");
+                }
+                processed++;
             }
         }
 

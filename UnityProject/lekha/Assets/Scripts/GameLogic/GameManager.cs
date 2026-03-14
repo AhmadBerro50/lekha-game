@@ -154,38 +154,54 @@ namespace Lekha.GameLogic
         /// </summary>
         private void HandleRemoteCardPlayed(Network.CardPlayedData playData)
         {
-            if (System.Enum.TryParse<PlayerPosition>(playData.Position, out PlayerPosition pos))
+            if (!System.Enum.TryParse<PlayerPosition>(playData.Position, out PlayerPosition pos))
+                return;
+
+            // Guard: don't process if not in trick-playing state
+            if (currentState != GameState.PlayingTricks)
             {
-                Player player = GetPlayerAtPosition(pos);
-                Card card = playData.Card.ToCard();
+                Debug.LogWarning($"[GameManager] Ignoring remote card play — not in PlayingTricks (state={currentState})");
+                return;
+            }
 
-                Debug.Log($"[GameManager] Remote player {pos} played {card}");
+            // Guard: don't process if already handling a remote play (duplicate message)
+            if (isProcessingRemotePlay)
+            {
+                Debug.LogWarning($"[GameManager] Ignoring duplicate remote card play from {pos}");
+                return;
+            }
 
-                // Set flag to prevent re-sending to network
-                isProcessingRemotePlay = true;
-                try
-                {
-                    // For non-host clients, remote players' hands may be empty
-                    // We need to add the card temporarily to allow PlayCard to work
-                    bool cardWasInHand = player.Hand.Any(c => c.Equals(card));
-                    if (!cardWasInHand)
-                    {
-                        // Add card to hand so PlayCard can remove it
-                        player.AddPassedCards(new List<Card> { card });
-                        Debug.Log($"[GameManager] Added card {card} to {player.PlayerName}'s hand for play");
-                    }
+            // Guard: check if trick already has 4 cards (stale message)
+            if (currentTrick.Count >= 4)
+            {
+                Debug.LogWarning($"[GameManager] Ignoring remote card play — trick already complete ({currentTrick.Count} cards)");
+                return;
+            }
 
-                    // Play the card (this updates local game state)
-                    PlayCard(player, card);
-                }
-                catch (System.Exception e)
+            Player player = GetPlayerAtPosition(pos);
+            Card card = playData.Card.ToCard();
+
+            Debug.Log($"[GameManager] Remote player {pos} played {card}");
+
+            isProcessingRemotePlay = true;
+            try
+            {
+                // For non-host clients, remote players' hands may be empty
+                bool cardWasInHand = player.Hand.Any(c => c.Equals(card));
+                if (!cardWasInHand)
                 {
-                    Debug.LogError($"[GameManager] Exception in HandleRemoteCardPlayed: {e.Message}\n{e.StackTrace}");
+                    player.AddPassedCards(new List<Card> { card });
                 }
-                finally
-                {
-                    isProcessingRemotePlay = false;
-                }
+
+                PlayCard(player, card);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[GameManager] Exception in HandleRemoteCardPlayed: {e.Message}\n{e.StackTrace}");
+            }
+            finally
+            {
+                isProcessingRemotePlay = false;
             }
         }
 
@@ -193,6 +209,8 @@ namespace Lekha.GameLogic
         private HashSet<string> receivedPassFrom = new HashSet<string>();
         private bool localPassSubmitted = false;
         private Network.PassCardsData bufferedPassCards = null;
+        private Coroutine passPhaseTimeoutCoroutine = null;
+        private const float PASS_PHASE_TIMEOUT = 30f; // Max seconds to wait for pass cards
 
         /// <summary>
         /// Called by GameUI when the local player submits their pass cards.
@@ -269,12 +287,61 @@ namespace Lekha.GameLogic
         private void CompleteOnlinePassPhase()
         {
             Debug.Log("[GameManager] Online pass phase complete");
+            CancelPassPhaseTimeout();
             receivedPassFrom.Clear();
             localPassSubmitted = false;
             bufferedPassCards = null;
 
             OnPassPhaseComplete?.Invoke();
             StartTrickPhase();
+        }
+
+        /// <summary>
+        /// Start a timeout coroutine for the pass phase — if it takes too long, force completion
+        /// </summary>
+        public void StartPassPhaseTimeout()
+        {
+            CancelPassPhaseTimeout();
+            if (isOnlineGame)
+            {
+                passPhaseTimeoutCoroutine = StartCoroutine(PassPhaseTimeoutCoroutine());
+            }
+        }
+
+        private void CancelPassPhaseTimeout()
+        {
+            if (passPhaseTimeoutCoroutine != null)
+            {
+                StopCoroutine(passPhaseTimeoutCoroutine);
+                passPhaseTimeoutCoroutine = null;
+            }
+        }
+
+        private System.Collections.IEnumerator PassPhaseTimeoutCoroutine()
+        {
+            yield return new WaitForSeconds(PASS_PHASE_TIMEOUT);
+
+            if (currentState == GameState.PassingCards)
+            {
+                Debug.LogError($"[GameManager] Pass phase timeout after {PASS_PHASE_TIMEOUT}s — forcing completion");
+                // If local player hasn't submitted, auto-submit first 3 cards
+                if (!localPassSubmitted)
+                {
+                    Player local = GetHumanPlayer();
+                    if (local != null && local.Hand.Count >= 3)
+                    {
+                        var autoPass = local.Hand.Take(3).ToList();
+                        Debug.LogWarning($"[GameManager] Auto-passing 3 cards for timeout: {string.Join(", ", autoPass.Select(c => c.GetUnoName()))}");
+                        // Submit them through the normal path
+                        var passDict = new Dictionary<Player, List<Card>> { { local, autoPass } };
+                        OnPassPhaseComplete?.Invoke();
+                    }
+                    localPassSubmitted = true;
+                }
+                // Force complete
+                CompleteOnlinePassPhase();
+            }
+            passPhaseTimeoutCoroutine = null;
         }
 
         /// <summary>
@@ -389,6 +456,7 @@ namespace Lekha.GameLogic
 
             OnCardsDealt?.Invoke();
             SetState(GameState.PassingCards);
+            StartPassPhaseTimeout();
         }
 
         /// <summary>
@@ -446,6 +514,7 @@ namespace Lekha.GameLogic
 
             // Move to pass phase
             SetState(GameState.PassingCards);
+            StartPassPhaseTimeout();
         }
 
         /// <summary>

@@ -99,79 +99,90 @@ namespace Lekha.UI
         private System.Collections.IEnumerator WatchdogCoroutine()
         {
             const float checkInterval  = 2f;
-            const float stuckThreshold = 5f;  // Basic recovery threshold
-            const float deepStuck      = 15f; // Deep-stuck: force re-highlight / resync
+            const float stuckThreshold = 6f;  // First recovery attempt
+            const float deepStuck      = 12f; // Aggressive recovery
+            const float forceReset     = 20f; // Nuclear: clear all locks
 
             while (true)
             {
                 yield return new WaitForSeconds(checkInterval);
 
-                // Only check if we're supposed to be playing
                 if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.PlayingTricks)
                 {
-                    lastActionTime = Time.time; // Reset timer when not playing
-                    continue;
-                }
-
-                // Don't interfere if cooldown is active
-                if (!CanPlayNow())
-                {
-                    Debug.Log($"[Watchdog] Cooldown active ({GetRemainingCooldown():F2}s), skipping check");
+                    lastActionTime = Time.time;
                     continue;
                 }
 
                 float timeSinceLastAction = Time.time - lastActionTime;
                 if (timeSinceLastAction <= stuckThreshold) continue;
 
-                Debug.LogWarning($"[Watchdog] Game stuck for {timeSinceLastAction:F1}s — recovering");
-
-                // Reset blocking flags
-                isProcessingPlay   = false;
-                nextAllowedPlayTime = 0f;
-
                 Player currentPlayer = GameManager.Instance.CurrentPlayer;
-                bool   isLocalTurn   = GameManager.Instance.IsLocalPlayerTurn();
+                if (currentPlayer == null) continue;
+                bool isLocalTurn = GameManager.Instance.IsLocalPlayerTurn();
 
-                if (isLocalTurn)
+                // Level 1 (6s): Gentle nudge — don't clear locks, just re-trigger the action
+                if (timeSinceLastAction <= deepStuck)
                 {
-                    Debug.Log("[Watchdog] Highlighting cards for local player");
-                    HighlightPlayableCards();
-                }
-                else if (!GameManager.Instance.IsOnlineGame && !currentPlayer.IsHuman)
-                {
-                    Debug.Log($"[Watchdog] Triggering AI for {currentPlayer.PlayerName}");
-                    AIPlayCard();
-                }
-                else if (GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
-                {
-                    Debug.Log($"[Watchdog] HOST AI for disconnected {currentPlayer.PlayerName}");
-                    AIPlayCard();
-                }
-                else if (GameManager.Instance.IsOnlineGame && timeSinceLastAction > deepStuck)
-                {
-                    // Deep-stuck in online game waiting for a remote player.
-                    // Re-fire OnTrickStarted-equivalent to re-schedule the remote wait.
-                    Debug.LogWarning($"[Watchdog] Deep stuck {timeSinceLastAction:F1}s — re-triggering turn setup for {currentPlayer.PlayerName}");
-                    // Force re-highlight for local player or re-trigger AI if bot
-                    if (NetworkGameSync.Instance?.IsHost == true &&
-                        GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
-                    {
-                        AIPlayCard();
-                    }
-                    else if (isLocalTurn)
+                    Debug.LogWarning($"[Watchdog] Stuck {timeSinceLastAction:F0}s — gentle nudge for {currentPlayer.PlayerName}");
+                    if (isLocalTurn)
                     {
                         HighlightPlayableCards();
                     }
-                    else
+                    else if (!GameManager.Instance.IsOnlineGame && !currentPlayer.IsHuman)
                     {
-                        // Nothing we can do; update instruction text so player knows we're waiting
+                        ScheduleAIPlay(0.1f);
+                    }
+                    else if (GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
+                    {
+                        ScheduleAIPlay(0.1f);
+                    }
+                    continue;
+                }
+
+                // Level 2 (12s): Aggressive — clear cooldown only, re-trigger
+                if (timeSinceLastAction <= forceReset)
+                {
+                    Debug.LogWarning($"[Watchdog] Deep stuck {timeSinceLastAction:F0}s — clearing cooldown");
+                    nextAllowedPlayTime = 0f;
+
+                    if (isLocalTurn)
+                    {
+                        HighlightPlayableCards();
+                    }
+                    else if (GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
+                    {
+                        ScheduleAIPlay(0.1f);
+                    }
+                    else if (!GameManager.Instance.IsOnlineGame && !currentPlayer.IsHuman)
+                    {
+                        ScheduleAIPlay(0.1f);
+                    }
+                    else if (GameManager.Instance.IsOnlineGame)
+                    {
                         if (instructionText != null)
                             instructionText.text = $"Waiting for {currentPlayer.PlayerName}...";
                     }
+                    continue;
                 }
-                else
+
+                // Level 3 (20s): Nuclear — clear ALL locks and force action
+                Debug.LogError($"[Watchdog] NUCLEAR reset after {timeSinceLastAction:F0}s stuck");
+                isProcessingPlay = false;
+                nextAllowedPlayTime = 0f;
+                isAnimating = false;
+                lastActionTime = Time.time; // Prevent immediate re-trigger
+
+                if (isLocalTurn)
                 {
-                    Debug.Log($"[Watchdog] Online — waiting for remote player {currentPlayer.PlayerName}");
+                    HighlightPlayableCards();
+                }
+                else if (GameManager.Instance.ShouldHostPlayForPosition(currentPlayer.Position))
+                {
+                    ScheduleAIPlay(0.2f);
+                }
+                else if (!GameManager.Instance.IsOnlineGame && !currentPlayer.IsHuman)
+                {
+                    ScheduleAIPlay(0.2f);
                 }
 
                 lastActionTime = Time.time;
@@ -2389,11 +2400,15 @@ namespace Lekha.UI
         /// </summary>
         public void TriggerDisconnectedPlayerAI()
         {
+            if (GameManager.Instance == null) return;
             if (GameManager.Instance.CurrentState == GameState.PlayingTricks)
             {
+                // Cancel any existing turn setup or AI play first
+                CancelPendingAIPlay();
                 float delay = GetRemainingCooldown() + 0.3f;
                 if (delay < 0.5f) delay = 0.5f;
                 ScheduleAIPlay(delay);
+                ResetWatchdogTimer();
             }
         }
 
