@@ -194,9 +194,9 @@ namespace Lekha.UI
             gradientTex.filterMode = FilterMode.Bilinear;
             gradientTex.wrapMode = TextureWrapMode.Clamp;
 
-            Color topColor    = new Color(0.16f, 0.20f, 0.38f, 1f); // Rich blue top
-            Color midColor    = new Color(0.12f, 0.14f, 0.30f, 1f); // Medium blue mid
-            Color bottomColor = new Color(0.08f, 0.09f, 0.20f, 1f); // Dark blue bottom
+            Color topColor    = new Color(0.06f, 0.22f, 0.38f, 1f); // Deep teal top
+            Color midColor    = new Color(0.04f, 0.12f, 0.24f, 1f); // Dark ocean mid
+            Color bottomColor = new Color(0.02f, 0.05f, 0.12f, 1f); // Midnight bottom
 
             for (int y = 0; y < texH; y++)
             {
@@ -236,7 +236,7 @@ namespace Lekha.UI
                 }
             spotTex.Apply();
             spotImg.sprite = Sprite.Create(spotTex, new Rect(0, 0, spotSize, spotSize), new Vector2(0.5f, 0.5f));
-            spotImg.color = new Color(0.25f, 0.30f, 0.55f, 0.30f); // Soft blue-white glow
+            spotImg.color = new Color(0.10f, 0.35f, 0.50f, 0.25f); // Teal centre glow
             spotImg.raycastTarget = false;
 
             // ── Layer 3: Soft vignette (darkens edges naturally) ──────────────
