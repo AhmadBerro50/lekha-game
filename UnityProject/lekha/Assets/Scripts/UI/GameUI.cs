@@ -953,6 +953,28 @@ namespace Lekha.UI
             {
                 baseImg.sprite = Sprite.Create(bgTex, new Rect(0, 0, bgTex.width, bgTex.height), new Vector2(0.5f, 0.5f));
                 baseImg.color = Color.white;
+
+                // Fill-to-cover: scale so the image fills the screen without stretching
+                // If the image is squarish and screen is 16:9, we expand vertically and crop top/bottom
+                float screenAspect = 1920f / 1080f;
+                float texAspect = (float)bgTex.width / bgTex.height;
+                if (texAspect < screenAspect)
+                {
+                    // Image narrower than screen — widen anchors to fill width, crops top/bottom
+                    float scale = screenAspect / texAspect;
+                    float overflow = (scale - 1f) / 2f;
+                    baseRect.anchorMin = new Vector2(0f, -overflow);
+                    baseRect.anchorMax = new Vector2(1f, 1f + overflow);
+                }
+                else
+                {
+                    // Image wider than screen — heighten anchors to fill height, crops sides
+                    float scale = texAspect / screenAspect;
+                    float overflow = (scale - 1f) / 2f;
+                    baseRect.anchorMin = new Vector2(-overflow, 0f);
+                    baseRect.anchorMax = new Vector2(1f + overflow, 1f);
+                }
+                baseRect.sizeDelta = Vector2.zero;
             }
             else
             {
