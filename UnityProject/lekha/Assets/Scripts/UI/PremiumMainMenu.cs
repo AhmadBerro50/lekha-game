@@ -43,9 +43,9 @@ namespace Lekha.UI
 
         public System.Action OnPlayClicked;
 
-        // Modern 2026 Color Palette - Glassmorphism
-        private static readonly Color DeepNavy = new Color(0.06f, 0.08f, 0.14f, 1f);         // Deep background
-        private static readonly Color RichPurple = new Color(0.18f, 0.12f, 0.35f, 1f);       // Rich purple accent
+        // Modern 2026 Color Palette
+        private static readonly Color DeepNavy = new Color(0.04f, 0.06f, 0.12f, 1f);         // Deep rich background
+        private static readonly Color RichPurple = new Color(0.10f, 0.08f, 0.22f, 1f);       // Subtle purple mid
         private static readonly Color AccentCyan = new Color(0.40f, 0.75f, 1f, 1f);          // Bright cyan accent
         private static readonly Color AccentMagenta = new Color(0.85f, 0.45f, 0.95f, 1f);    // Vibrant magenta
         private static readonly Color TextWhite = new Color(1f, 1f, 1f, 1f);                  // Pure white
@@ -178,7 +178,7 @@ namespace Lekha.UI
 
         private void CreateLuxuryBackground(Transform parent)
         {
-            // Base dark layer with modern gradient
+            // ── Layer 1: Smooth vertical gradient (dark navy top → deep black bottom) ──
             GameObject bgObj = new GameObject("Background");
             bgObj.transform.SetParent(parent, false);
 
@@ -189,52 +189,61 @@ namespace Lekha.UI
 
             Image bgImg = bgObj.AddComponent<Image>();
 
-            // Create modern gradient texture (deep navy to purple to dark)
-            int texHeight = 512;
-            int texWidth = 512;
-            Texture2D gradientTex = new Texture2D(texWidth, texHeight, TextureFormat.RGBA32, false);
-            Vector2 center = new Vector2(texWidth / 2f, texHeight / 2f);
+            int texW = 4, texH = 256;
+            Texture2D gradientTex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
+            gradientTex.filterMode = FilterMode.Bilinear;
+            gradientTex.wrapMode = TextureWrapMode.Clamp;
 
-            for (int y = 0; y < texHeight; y++)
+            Color topColor    = new Color(0.08f, 0.10f, 0.20f, 1f); // Navy blue top
+            Color midColor    = new Color(0.06f, 0.07f, 0.16f, 1f); // Deep blue mid
+            Color bottomColor = new Color(0.03f, 0.03f, 0.08f, 1f); // Near-black bottom
+
+            for (int y = 0; y < texH; y++)
             {
-                for (int x = 0; x < texWidth; x++)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), center) / (texHeight * 0.7f);
-                    dist = Mathf.Clamp01(dist);
+                float t = (float)y / (texH - 1); // 0 = bottom, 1 = top
+                Color c;
+                if (t < 0.5f)
+                    c = Color.Lerp(bottomColor, midColor, t / 0.5f);
+                else
+                    c = Color.Lerp(midColor, topColor, (t - 0.5f) / 0.5f);
 
-                    // Multi-tone gradient from center to edges
-                    Color color;
-                    if (dist < 0.4f)
-                    {
-                        float t = dist / 0.4f;
-                        color = Color.Lerp(new Color(0.12f, 0.20f, 0.40f, 1f), RichPurple, t);
-                    }
-                    else
-                    {
-                        float t = (dist - 0.4f) / 0.6f;
-                        color = Color.Lerp(RichPurple, VelvetBlack, t);
-                    }
-
-                    // Add subtle noise
-                    float noise = Mathf.PerlinNoise(x * 0.02f, y * 0.02f) * 0.02f - 0.01f;
-                    color.r = Mathf.Clamp01(color.r + noise);
-                    color.g = Mathf.Clamp01(color.g + noise);
-                    color.b = Mathf.Clamp01(color.b + noise * 1.5f);
-
-                    gradientTex.SetPixel(x, y, color);
-                }
+                for (int x = 0; x < texW; x++)
+                    gradientTex.SetPixel(x, y, c);
             }
             gradientTex.Apply();
-            bgImg.sprite = Sprite.Create(gradientTex, new Rect(0, 0, texWidth, texHeight), new Vector2(0.5f, 0.5f));
+            bgImg.sprite = Sprite.Create(gradientTex, new Rect(0, 0, texW, texH), new Vector2(0.5f, 0.5f));
+            bgImg.raycastTarget = false;
 
-            // Vignette overlay for depth
-            CreateVignette(bgObj.transform);
+            // ── Layer 2: Subtle centre spotlight ──────────────────────────────
+            GameObject spotObj = new GameObject("CentreSpot");
+            spotObj.transform.SetParent(parent, false);
+            RectTransform spotRect = spotObj.AddComponent<RectTransform>();
+            spotRect.anchorMin = Vector2.zero;
+            spotRect.anchorMax = Vector2.one;
+            spotRect.sizeDelta = Vector2.zero;
 
-            // Animated floating particles (cyan/magenta glow)
+            Image spotImg = spotObj.AddComponent<Image>();
+            int spotSize = 256;
+            Texture2D spotTex = new Texture2D(spotSize, spotSize, TextureFormat.RGBA32, false);
+            spotTex.filterMode = FilterMode.Bilinear;
+            Vector2 sc = new Vector2(spotSize / 2f, spotSize / 2f);
+            for (int y = 0; y < spotSize; y++)
+                for (int x = 0; x < spotSize; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x, y), sc) / (spotSize / 2f);
+                    float a = Mathf.Pow(Mathf.Max(0, 1f - d), 2.5f);
+                    spotTex.SetPixel(x, y, new Color(1, 1, 1, a));
+                }
+            spotTex.Apply();
+            spotImg.sprite = Sprite.Create(spotTex, new Rect(0, 0, spotSize, spotSize), new Vector2(0.5f, 0.5f));
+            spotImg.color = new Color(0.15f, 0.18f, 0.40f, 0.35f); // Subtle blue-white glow
+            spotImg.raycastTarget = false;
+
+            // ── Layer 3: Soft vignette (darkens edges naturally) ──────────────
+            CreateVignette(parent);
+
+            // ── Layer 4: Floating particles (fewer, subtler) ─────────────────
             CreateAnimatedBackground(parent);
-
-            // Modern corner accents
-            CreateCornerOrnaments(parent);
         }
 
         private void CreateVignette(Transform parent)
@@ -249,9 +258,9 @@ namespace Lekha.UI
 
             Image img = vignetteObj.AddComponent<Image>();
 
-            // Create radial vignette
             int size = 256;
             Texture2D vignetteTex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            vignetteTex.filterMode = FilterMode.Bilinear;
             Vector2 center = new Vector2(size / 2f, size / 2f);
 
             for (int y = 0; y < size; y++)
@@ -259,7 +268,8 @@ namespace Lekha.UI
                 for (int x = 0; x < size; x++)
                 {
                     float dist = Vector2.Distance(new Vector2(x, y), center) / (size / 2f);
-                    float alpha = Mathf.Pow(dist, 1.5f) * 0.7f;
+                    // Gentle vignette — mostly transparent centre, dark at edges
+                    float alpha = Mathf.Pow(Mathf.Clamp01(dist), 2.0f) * 0.55f;
                     vignetteTex.SetPixel(x, y, new Color(0, 0, 0, alpha));
                 }
             }
@@ -279,8 +289,8 @@ namespace Lekha.UI
             containerRect.anchorMax = Vector2.one;
             containerRect.sizeDelta = Vector2.zero;
 
-            // Create floating gold dust particles
-            for (int i = 0; i < 30; i++)
+            // Subtle floating dust particles
+            for (int i = 0; i < 15; i++)
             {
                 StartCoroutine(CreateFloatingParticle(particleContainer.transform, i));
             }
@@ -295,7 +305,7 @@ namespace Lekha.UI
             backgroundParticles.Add(particle);
 
             RectTransform rect = particle.AddComponent<RectTransform>();
-            float size = Random.Range(4f, 12f);
+            float size = Random.Range(2f, 6f);
             rect.sizeDelta = new Vector2(size, size);
 
             Image img = particle.AddComponent<Image>();
@@ -318,9 +328,8 @@ namespace Lekha.UI
             img.sprite = Sprite.Create(particleTex, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
             img.raycastTarget = false;
 
-            // Random particle color (cyan or magenta variants)
-            Color particleColor = Random.value > 0.5f ? AccentCyan : AccentMagenta;
-            particleColor = Color.Lerp(particleColor, TextWhite, Random.Range(0f, 0.3f));
+            // Soft white / pale cyan particles (no harsh magenta)
+            Color particleColor = Color.Lerp(new Color(0.6f, 0.75f, 1f), TextWhite, Random.Range(0.3f, 0.7f));
 
             // Animate particle floating upward
             while (particle != null)
@@ -333,7 +342,7 @@ namespace Lekha.UI
                 float elapsed = 0;
                 float wobbleSpeed = Random.Range(0.5f, 1.5f);
                 float wobbleAmount = Random.Range(20f, 60f);
-                float maxAlpha = Random.Range(0.2f, 0.5f);
+                float maxAlpha = Random.Range(0.1f, 0.3f);
 
                 while (elapsed < duration && particle != null)
                 {
@@ -357,18 +366,7 @@ namespace Lekha.UI
 
         private void CreateCornerOrnaments(Transform parent)
         {
-            // Modern corner glow accents
-            float glowSize = 200f;
-            float offset = -20f;
-
-            // Top-left - cyan glow
-            CreateCornerGlow(parent, new Vector2(0, 1), new Vector2(offset, -offset), glowSize, AccentCyan);
-            // Top-right - magenta glow
-            CreateCornerGlow(parent, new Vector2(1, 1), new Vector2(-offset, -offset), glowSize, AccentMagenta);
-            // Bottom-left - magenta glow
-            CreateCornerGlow(parent, new Vector2(0, 0), new Vector2(offset, offset), glowSize, AccentMagenta);
-            // Bottom-right - cyan glow
-            CreateCornerGlow(parent, new Vector2(1, 0), new Vector2(-offset, offset), glowSize, AccentCyan);
+            // Removed — clean gradient background looks better without corner blobs
         }
 
         private void CreateCornerGlow(Transform parent, Vector2 anchor, Vector2 position, float size, Color glowColor)
@@ -461,7 +459,7 @@ namespace Lekha.UI
 
                 RectTransform cardRect = cardObj.AddComponent<RectTransform>();
                 cardRect.anchoredPosition = Vector2.zero;
-                cardRect.sizeDelta = new Vector2(140, 200);
+                cardRect.sizeDelta = new Vector2(160, 230);
                 cardRect.localScale = Vector3.one;
 
                 Image cardImg = cardObj.AddComponent<Image>();
@@ -650,75 +648,65 @@ namespace Lekha.UI
 
         private IEnumerator PlayCardRevealIntro()
         {
-            yield return new WaitForSeconds(0.3f);
+            yield return new WaitForSeconds(0.2f);
 
-            // Phase 1: Cards appear stacked in center
+            // Hide all cards initially
             foreach (var card in introCards)
-            {
                 card.localScale = Vector3.zero;
-            }
 
-            // Animate cards appearing one by one
-            for (int i = 0; i < introCards.Count; i++)
+            // ── Phase 1: Cards cascade in from top, one by one ──
+            int count = introCards.Count;
+            float[] fanX = { -240f, -120f, 0f, 120f, 240f };
+            float[] fanAngle = { -15f, -7f, 0f, 7f, 15f };
+
+            for (int i = 0; i < count; i++)
             {
-                StartCoroutine(AnimateCardAppear(introCards[i], i * 0.15f));
+                StartCoroutine(AnimateCardCascadeIn(introCards[i], fanX[i], fanAngle[i], i * 0.12f));
             }
 
-            yield return new WaitForSeconds(1f);
+            yield return new WaitForSeconds(0.12f * count + 0.6f);
 
-            // Phase 2: Cards fan out dramatically
-            float[] targetAngles = { -40f, -20f, 0f, 20f, 40f };
-            float[] targetX = { -200f, -100f, 0f, 100f, 200f };
+            // ── Phase 2: Hold the fan for a beat ──
+            yield return new WaitForSeconds(0.8f);
 
-            for (int i = 0; i < introCards.Count; i++)
+            // ── Phase 3: Cards smoothly slide off screen ──
+            for (int i = 0; i < count; i++)
             {
-                StartCoroutine(AnimateCardFanOut(introCards[i], targetX[i], targetAngles[i], i * 0.08f));
+                float dir = (i < count / 2) ? -1f : (i > count / 2) ? 1f : 0f;
+                float flyX = dir * 1400f;
+                float flyY = (i == count / 2) ? 800f : -200f + i * 100f;
+                StartCoroutine(AnimateCardSlideOff(introCards[i], flyX, flyY, i * 0.06f));
             }
 
-            yield return new WaitForSeconds(1.2f);
+            yield return new WaitForSeconds(0.4f);
 
-            // Phase 3: Cards fly away, revealing logo
-            for (int i = 0; i < introCards.Count; i++)
-            {
-                float flyX = (i < 2) ? -1200f : (i > 2) ? 1200f : 0f;
-                float flyY = (i == 2) ? -800f : (i % 2 == 0) ? 600f : -600f;
-                StartCoroutine(AnimateCardFlyAway(introCards[i], flyX, flyY, i * 0.05f));
-            }
-
-            // Reveal logo
-            yield return new WaitForSeconds(0.3f);
-
+            // ── Reveal logo ──
             Transform logoContainer = splashPanel.transform.Find("LogoContainer");
             if (logoContainer != null)
             {
                 CanvasGroup logoCg = logoContainer.GetComponent<CanvasGroup>();
                 RectTransform logoRect = logoContainer.GetComponent<RectTransform>();
+                logoRect.localScale = Vector3.one * 0.85f;
 
-                float duration = 0.8f;
+                float duration = 0.7f;
                 float elapsed = 0;
-                logoRect.localScale = Vector3.one * 0.7f;
-
                 while (elapsed < duration)
                 {
                     elapsed += Time.deltaTime;
                     float t = elapsed / duration;
                     float easeT = 1 - Mathf.Pow(1 - t, 3);
-
                     logoCg.alpha = easeT;
-                    logoRect.localScale = Vector3.Lerp(Vector3.one * 0.7f, Vector3.one, easeT);
+                    logoRect.localScale = Vector3.Lerp(Vector3.one * 0.85f, Vector3.one, easeT);
                     yield return null;
                 }
             }
 
-            // Hold logo
-            yield return new WaitForSeconds(1.5f);
+            yield return new WaitForSeconds(1.2f);
 
-            // Transition to menu
+            // ── Transition to menu ──
             splashComplete = true;
-
-            float fadeDuration = 0.6f;
+            float fadeDuration = 0.5f;
             float fadeElapsed = 0;
-
             while (fadeElapsed < fadeDuration)
             {
                 fadeElapsed += Time.deltaTime;
@@ -729,74 +717,72 @@ namespace Lekha.UI
             splashPanel.SetActive(false);
             menuPanel.SetActive(true);
             StartCoroutine(AnimateMenuEntrance());
-
-            // Check if player needs to set their name (after main menu is visible)
             CheckPlayerNameAfterSplash();
         }
 
-        private IEnumerator AnimateCardAppear(RectTransform card, float delay)
+        /// <summary>
+        /// Card cascades in from above, lands at its fan position with a smooth spring feel
+        /// </summary>
+        private IEnumerator AnimateCardCascadeIn(RectTransform card, float targetX, float targetAngle, float delay)
         {
             yield return new WaitForSeconds(delay);
 
-            float duration = 0.3f;
+            float startY = 700f;
+            float duration = 0.55f;
             float elapsed = 0;
+
+            card.anchoredPosition = new Vector2(targetX * 0.3f, startY);
+            card.localRotation = Quaternion.Euler(0, 0, Random.Range(-30f, 30f));
+            card.localScale = Vector3.one * 0.8f;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                float easeT = 1 - Mathf.Pow(1 - t, 2);
-                card.localScale = Vector3.one * easeT;
+                float t = Mathf.Clamp01(elapsed / duration);
+                // Spring-out ease
+                float easeT = 1 - Mathf.Pow(1 - t, 3);
+                // Slight overshoot bounce
+                float bounce = 1f + Mathf.Sin(t * Mathf.PI) * 0.08f;
+
+                card.anchoredPosition = new Vector2(
+                    Mathf.Lerp(targetX * 0.3f, targetX, easeT),
+                    Mathf.Lerp(startY, 0f, easeT));
+                card.localRotation = Quaternion.Euler(0, 0, Mathf.LerpAngle(card.localEulerAngles.z > 180 ? card.localEulerAngles.z - 360 : card.localEulerAngles.z, targetAngle, easeT));
+                card.localScale = Vector3.one * Mathf.Lerp(0.8f, 1f, easeT) * bounce;
                 yield return null;
             }
 
+            card.anchoredPosition = new Vector2(targetX, 0);
+            card.localRotation = Quaternion.Euler(0, 0, targetAngle);
             card.localScale = Vector3.one;
         }
 
-        private IEnumerator AnimateCardFanOut(RectTransform card, float targetX, float targetAngle, float delay)
+        /// <summary>
+        /// Card smoothly slides off screen with gentle rotation and fade
+        /// </summary>
+        private IEnumerator AnimateCardSlideOff(RectTransform card, float targetX, float targetY, float delay)
         {
             yield return new WaitForSeconds(delay);
 
             Vector2 startPos = card.anchoredPosition;
             float startAngle = card.localEulerAngles.z;
+            if (startAngle > 180f) startAngle -= 360f;
             float duration = 0.5f;
             float elapsed = 0;
 
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                float easeT = 1 - Mathf.Pow(1 - t, 3);
-
-                card.anchoredPosition = Vector2.Lerp(startPos, new Vector2(targetX, 0), easeT);
-                card.localRotation = Quaternion.Euler(0, 0, Mathf.Lerp(startAngle, targetAngle, easeT));
-                yield return null;
-            }
-        }
-
-        private IEnumerator AnimateCardFlyAway(RectTransform card, float targetX, float targetY, float delay)
-        {
-            yield return new WaitForSeconds(delay);
-
-            Vector2 startPos = card.anchoredPosition;
-            float startAngle = card.localEulerAngles.z;
-            float duration = 0.6f;
-            float elapsed = 0;
-
             Image cardImg = card.GetComponent<Image>();
-            Color startColor = cardImg != null ? cardImg.color : Color.white;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                float easeT = t * t; // Ease in
+                float easeT = t * t * (3f - 2f * t); // Smoothstep
 
                 card.anchoredPosition = Vector2.Lerp(startPos, new Vector2(targetX, targetY), easeT);
-                card.localRotation = Quaternion.Euler(0, 0, startAngle + t * 360f);
+                card.localRotation = Quaternion.Euler(0, 0, Mathf.Lerp(startAngle, startAngle + 25f * Mathf.Sign(targetX), easeT));
 
                 if (cardImg != null)
-                    cardImg.color = new Color(startColor.r, startColor.g, startColor.b, 1 - t);
+                    cardImg.color = new Color(1, 1, 1, 1f - easeT);
 
                 yield return null;
             }
