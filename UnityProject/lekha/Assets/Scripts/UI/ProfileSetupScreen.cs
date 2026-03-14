@@ -558,7 +558,7 @@ namespace Lekha.UI
             RectTransform optionsRect = optionsPanel.AddComponent<RectTransform>();
             optionsRect.anchorMin = new Vector2(0.5f, 0.5f);
             optionsRect.anchorMax = new Vector2(0.5f, 0.5f);
-            optionsRect.sizeDelta = new Vector2(420, 520);
+            optionsRect.sizeDelta = new Vector2(420, 360);
 
             Image optionsBg = optionsPanel.AddComponent<Image>();
             optionsBg.color = DeepNavy;
@@ -584,31 +584,15 @@ namespace Lekha.UI
             titleTmp.alignment = TextAlignmentOptions.Center;
             titleTmp.fontStyle = FontStyles.Bold;
 
-            // Cartoon Avatars section
+            // Superhero avatars grid
             CreatePresetAvatarsSection(optionsPanel.transform, popupObj);
-
-            // Take Photo button
-            CreatePopupButton(optionsPanel.transform, "Take Photo", new Vector2(0, -340), () => {
-                Destroy(popupObj);
-                TakePhoto();
-            });
-
-            // Choose from Gallery button
-            CreatePopupButton(optionsPanel.transform, "Choose from Gallery", new Vector2(0, -395), () => {
-                Destroy(popupObj);
-                ChooseFromGallery();
-            });
-
-            // Remove Photo button (if has custom avatar)
-            var profile = PlayerProfileManager.Instance?.CurrentProfile;
-            if (profile != null && profile.HasCustomAvatar)
-            {
-                CreatePopupButton(optionsPanel.transform, "Remove Photo", new Vector2(0, -450), () => {
-                    Destroy(popupObj);
-                    RemoveAvatar();
-                });
-            }
         }
+
+        // Bundled avatar names (must match files in Resources/Avatars/)
+        private static readonly string[] BundledAvatarNames = new string[]
+        {
+            "blackpanther", "doctorstrange", "goku", "ironman", "itachi", "naruto"
+        };
 
         private void CreatePresetAvatarsSection(Transform parent, GameObject popupToDestroy)
         {
@@ -623,7 +607,7 @@ namespace Lekha.UI
             labelRect.sizeDelta = new Vector2(350, 25);
 
             TextMeshProUGUI labelTmp = labelObj.AddComponent<TextMeshProUGUI>();
-            labelTmp.text = "PRESET AVATARS";
+            labelTmp.text = "CHOOSE AVATAR";
             labelTmp.fontSize = 16;
             labelTmp.color = new Color(TextWhite.r, TextWhite.g, TextWhite.b, 0.7f);
             labelTmp.alignment = TextAlignmentOptions.Center;
@@ -639,489 +623,60 @@ namespace Lekha.UI
             gridRect.sizeDelta = new Vector2(380, 160);
 
             GridLayoutGroup gridLayout = gridObj.AddComponent<GridLayoutGroup>();
-            gridLayout.cellSize = new Vector2(70, 70);
-            gridLayout.spacing = new Vector2(10, 10);
+            gridLayout.cellSize = new Vector2(90, 90);
+            gridLayout.spacing = new Vector2(12, 12);
             gridLayout.childAlignment = TextAnchor.MiddleCenter;
             gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            gridLayout.constraintCount = 5;
+            gridLayout.constraintCount = 3;
             gridLayout.padding = new RectOffset(5, 5, 5, 5);
 
-            // Create 10 preset avatars
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Smiley, new Color(1f, 0.85f, 0.3f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Cool, new Color(0.3f, 0.7f, 1f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Happy, new Color(0.5f, 0.9f, 0.5f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Star, new Color(1f, 0.6f, 0.8f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Heart, new Color(1f, 0.4f, 0.5f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Crown, new Color(0.95f, 0.75f, 0.3f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Diamond, new Color(0.6f, 0.8f, 1f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Flame, new Color(1f, 0.5f, 0.2f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Lightning, new Color(0.9f, 0.9f, 0.3f));
-            CreatePresetAvatarButton(gridObj.transform, popupToDestroy, AvatarPresetType.Ace, new Color(0.2f, 0.2f, 0.3f));
+            // Create buttons for each bundled avatar
+            foreach (string avatarName in BundledAvatarNames)
+            {
+                CreateBundledAvatarButton(gridObj.transform, popupToDestroy, avatarName);
+            }
         }
 
-        private enum AvatarPresetType
+        private void CreateBundledAvatarButton(Transform parent, GameObject popupToDestroy, string avatarName)
         {
-            Smiley,
-            Cool,
-            Happy,
-            Star,
-            Heart,
-            Crown,
-            Diamond,
-            Flame,
-            Lightning,
-            Ace
-        }
-
-        private void CreatePresetAvatarButton(Transform parent, GameObject popupToDestroy, AvatarPresetType type, Color baseColor)
-        {
-            GameObject btnObj = new GameObject($"Preset_{type}");
+            GameObject btnObj = new GameObject($"Avatar_{avatarName}");
             btnObj.transform.SetParent(parent, false);
 
+            // Load the avatar texture from Resources
+            Texture2D tex = Resources.Load<Texture2D>($"Avatars/{avatarName}");
             Image btnImg = btnObj.AddComponent<Image>();
-            Texture2D avatarTex = CreatePresetAvatarTexture(type, baseColor);
-            btnImg.sprite = Sprite.Create(avatarTex, new Rect(0, 0, avatarTex.width, avatarTex.height), new Vector2(0.5f, 0.5f));
+            if (tex != null)
+            {
+                btnImg.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
+                    new Vector2(0.5f, 0.5f), 100f);
+            }
             btnImg.preserveAspect = true;
+
+            // Circular mask
+            Mask mask = btnObj.AddComponent<Mask>();
+            mask.showMaskGraphic = true;
 
             Button btn = btnObj.AddComponent<Button>();
             btn.targetGraphic = btnImg;
 
-            // Hover effect
             ColorBlock colors = btn.colors;
             colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1.1f, 1.1f, 1.1f);
-            colors.pressedColor = new Color(0.9f, 0.9f, 0.9f);
+            colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f);
+            colors.pressedColor = new Color(0.85f, 0.85f, 0.85f);
             btn.colors = colors;
 
-            AvatarPresetType capturedType = type;
-            Color capturedColor = baseColor;
-
+            string captured = avatarName;
             btn.onClick.AddListener(() => {
                 SoundManager.Instance?.PlayButtonClick();
-                ApplyPresetAvatar(capturedType, capturedColor);
+                ApplyBundledAvatar(captured);
                 if (popupToDestroy != null) Destroy(popupToDestroy);
             });
         }
 
-        private Texture2D CreatePresetAvatarTexture(AvatarPresetType type, Color baseColor)
+        private void ApplyBundledAvatar(string avatarName)
         {
-            int size = 128;
-            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            tex.filterMode = FilterMode.Bilinear;
-
-            Vector2 center = new Vector2(size / 2f, size / 2f);
-            float radius = size / 2f - 2;
-
-            // Fill with base color circle
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), center);
-                    if (dist <= radius)
-                    {
-                        // Gradient from center
-                        float t = dist / radius;
-                        Color c = Color.Lerp(baseColor * 1.1f, baseColor * 0.8f, t * 0.5f);
-                        tex.SetPixel(x, y, c);
-                    }
-                    else if (dist <= radius + 1.5f)
-                    {
-                        // Anti-aliased edge
-                        float alpha = 1f - (dist - radius) / 1.5f;
-                        tex.SetPixel(x, y, new Color(baseColor.r * 0.8f, baseColor.g * 0.8f, baseColor.b * 0.8f, alpha));
-                    }
-                    else
-                    {
-                        tex.SetPixel(x, y, Color.clear);
-                    }
-                }
-            }
-
-            // Draw icon overlay
-            DrawPresetIcon(tex, type, size);
-
-            tex.Apply();
-            return tex;
-        }
-
-        private void DrawPresetIcon(Texture2D tex, AvatarPresetType type, int size)
-        {
-            Color iconColor = new Color(1f, 1f, 1f, 0.95f);
-            Color darkColor = new Color(0.1f, 0.1f, 0.1f, 0.9f);
-            Vector2 center = new Vector2(size / 2f, size / 2f);
-
-            switch (type)
-            {
-                case AvatarPresetType.Smiley:
-                    // Simple smiley face
-                    DrawCircle(tex, new Vector2(size * 0.35f, size * 0.6f), 6, darkColor); // Left eye
-                    DrawCircle(tex, new Vector2(size * 0.65f, size * 0.6f), 6, darkColor); // Right eye
-                    DrawArc(tex, center, size * 0.25f, 200, 340, 4, darkColor); // Smile
-                    break;
-
-                case AvatarPresetType.Cool:
-                    // Sunglasses face
-                    DrawRect(tex, new Vector2(size * 0.2f, size * 0.55f), 25, 12, darkColor); // Left lens
-                    DrawRect(tex, new Vector2(size * 0.55f, size * 0.55f), 25, 12, darkColor); // Right lens
-                    DrawLine(tex, new Vector2(size * 0.45f, size * 0.6f), new Vector2(size * 0.55f, size * 0.6f), 3, darkColor); // Bridge
-                    DrawArc(tex, center, size * 0.2f, 210, 330, 3, darkColor); // Slight smile
-                    break;
-
-                case AvatarPresetType.Happy:
-                    // Big smile face
-                    DrawCircle(tex, new Vector2(size * 0.35f, size * 0.6f), 5, darkColor);
-                    DrawCircle(tex, new Vector2(size * 0.65f, size * 0.6f), 5, darkColor);
-                    DrawArc(tex, new Vector2(center.x, center.y - 5), size * 0.3f, 200, 340, 5, darkColor);
-                    break;
-
-                case AvatarPresetType.Star:
-                    // Star shape
-                    DrawStar(tex, center, size * 0.35f, 5, iconColor);
-                    break;
-
-                case AvatarPresetType.Heart:
-                    // Heart shape
-                    DrawHeart(tex, center, size * 0.35f, iconColor);
-                    break;
-
-                case AvatarPresetType.Crown:
-                    // Crown
-                    DrawCrown(tex, center, size * 0.4f, iconColor);
-                    break;
-
-                case AvatarPresetType.Diamond:
-                    // Diamond shape
-                    DrawDiamond(tex, center, size * 0.35f, iconColor);
-                    break;
-
-                case AvatarPresetType.Flame:
-                    // Flame
-                    DrawFlame(tex, center, size * 0.35f, iconColor);
-                    break;
-
-                case AvatarPresetType.Lightning:
-                    // Lightning bolt
-                    DrawLightning(tex, center, size * 0.35f, iconColor);
-                    break;
-
-                case AvatarPresetType.Ace:
-                    // Ace of spades symbol
-                    DrawSpade(tex, center, size * 0.35f, iconColor);
-                    break;
-            }
-        }
-
-        private void DrawCircle(Texture2D tex, Vector2 center, float radius, Color color)
-        {
-            int minX = Mathf.Max(0, (int)(center.x - radius - 1));
-            int maxX = Mathf.Min(tex.width, (int)(center.x + radius + 1));
-            int minY = Mathf.Max(0, (int)(center.y - radius - 1));
-            int maxY = Mathf.Min(tex.height, (int)(center.y + radius + 1));
-
-            for (int y = minY; y < maxY; y++)
-            {
-                for (int x = minX; x < maxX; x++)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), center);
-                    if (dist <= radius)
-                    {
-                        Color existing = tex.GetPixel(x, y);
-                        tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
-                    }
-                }
-            }
-        }
-
-        private void DrawRect(Texture2D tex, Vector2 topLeft, float width, float height, Color color)
-        {
-            int minX = Mathf.Max(0, (int)topLeft.x);
-            int maxX = Mathf.Min(tex.width, (int)(topLeft.x + width));
-            int minY = Mathf.Max(0, (int)topLeft.y);
-            int maxY = Mathf.Min(tex.height, (int)(topLeft.y + height));
-
-            for (int y = minY; y < maxY; y++)
-            {
-                for (int x = minX; x < maxX; x++)
-                {
-                    Color existing = tex.GetPixel(x, y);
-                    tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
-                }
-            }
-        }
-
-        private void DrawLine(Texture2D tex, Vector2 start, Vector2 end, float thickness, Color color)
-        {
-            float dist = Vector2.Distance(start, end);
-            for (float t = 0; t <= 1; t += 1f / dist)
-            {
-                Vector2 point = Vector2.Lerp(start, end, t);
-                DrawCircle(tex, point, thickness / 2f, color);
-            }
-        }
-
-        private void DrawArc(Texture2D tex, Vector2 center, float radius, float startAngle, float endAngle, float thickness, Color color)
-        {
-            for (float angle = startAngle; angle <= endAngle; angle += 2)
-            {
-                float rad = angle * Mathf.Deg2Rad;
-                Vector2 point = center + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * radius;
-                DrawCircle(tex, point, thickness / 2f, color);
-            }
-        }
-
-        private void DrawStar(Texture2D tex, Vector2 center, float radius, int points, Color color)
-        {
-            float innerRadius = radius * 0.4f;
-
-            for (int i = 0; i < points * 2; i++)
-            {
-                float angle1 = (i * 180f / points - 90) * Mathf.Deg2Rad;
-                float angle2 = ((i + 1) * 180f / points - 90) * Mathf.Deg2Rad;
-
-                float r1 = (i % 2 == 0) ? radius : innerRadius;
-                float r2 = ((i + 1) % 2 == 0) ? radius : innerRadius;
-
-                Vector2 p1 = center + new Vector2(Mathf.Cos(angle1), Mathf.Sin(angle1)) * r1;
-                Vector2 p2 = center + new Vector2(Mathf.Cos(angle2), Mathf.Sin(angle2)) * r2;
-
-                DrawLine(tex, p1, p2, 4, color);
-            }
-
-            // Fill center
-            DrawCircle(tex, center, innerRadius * 0.8f, color);
-        }
-
-        private void DrawHeart(Texture2D tex, Vector2 center, float size, Color color)
-        {
-            // Draw heart using two circles and a triangle
-            float circleRadius = size * 0.35f;
-            Vector2 leftCircle = center + new Vector2(-size * 0.25f, size * 0.15f);
-            Vector2 rightCircle = center + new Vector2(size * 0.25f, size * 0.15f);
-
-            // Fill circles
-            for (int y = 0; y < tex.height; y++)
-            {
-                for (int x = 0; x < tex.width; x++)
-                {
-                    Vector2 p = new Vector2(x, y);
-                    float distLeft = Vector2.Distance(p, leftCircle);
-                    float distRight = Vector2.Distance(p, rightCircle);
-
-                    // Check if in circles
-                    if (distLeft <= circleRadius || distRight <= circleRadius)
-                    {
-                        Color existing = tex.GetPixel(x, y);
-                        tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
-                    }
-                    // Check if in lower triangle
-                    else if (y < center.y + size * 0.1f && y > center.y - size * 0.55f)
-                    {
-                        float width = (center.y + size * 0.1f - y) / (size * 0.65f) * size * 0.6f;
-                        if (Mathf.Abs(x - center.x) < width)
-                        {
-                            Color existing = tex.GetPixel(x, y);
-                            tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
-                        }
-                    }
-                }
-            }
-        }
-
-        private void DrawCrown(Texture2D tex, Vector2 center, float size, Color color)
-        {
-            // Simple crown shape
-            float baseY = center.y - size * 0.3f;
-            float topY = center.y + size * 0.4f;
-
-            // Base rectangle
-            DrawRect(tex, new Vector2(center.x - size * 0.5f, baseY), size, size * 0.2f, color);
-
-            // Three points
-            Vector2[] points = {
-                new Vector2(center.x - size * 0.4f, baseY + size * 0.2f),
-                new Vector2(center.x - size * 0.25f, topY),
-                new Vector2(center.x, baseY + size * 0.35f),
-                new Vector2(center.x + size * 0.25f, topY),
-                new Vector2(center.x + size * 0.4f, baseY + size * 0.2f)
-            };
-
-            for (int i = 0; i < points.Length - 1; i++)
-            {
-                DrawLine(tex, points[i], points[i + 1], 6, color);
-            }
-
-            // Fill between points
-            for (int y = (int)baseY; y < (int)topY; y++)
-            {
-                for (int x = (int)(center.x - size * 0.5f); x < (int)(center.x + size * 0.5f); x++)
-                {
-                    if (x >= 0 && x < tex.width && y >= 0 && y < tex.height)
-                    {
-                        Vector2 p = new Vector2(x, y);
-                        // Simple check if point is inside crown shape
-                        if (y < baseY + size * 0.2f || IsInsideCrown(p, center, size, baseY))
-                        {
-                            Color existing = tex.GetPixel(x, y);
-                            if (existing.a < 0.5f) // Only fill if not already filled
-                                tex.SetPixel(x, y, Color.Lerp(existing, color, color.a * 0.9f));
-                        }
-                    }
-                }
-            }
-        }
-
-        private bool IsInsideCrown(Vector2 p, Vector2 center, float size, float baseY)
-        {
-            // Simplified crown check - just check if within general bounds
-            float normalizedX = (p.x - center.x) / size;
-            float normalizedY = (p.y - baseY) / size;
-
-            if (normalizedY < 0.2f) return Mathf.Abs(normalizedX) < 0.5f;
-
-            // Wavy top
-            float maxHeight = 0.7f - Mathf.Abs(Mathf.Sin(normalizedX * 4f)) * 0.35f;
-            return normalizedY < maxHeight && Mathf.Abs(normalizedX) < 0.5f;
-        }
-
-        private void DrawDiamond(Texture2D tex, Vector2 center, float size, Color color)
-        {
-            // Diamond shape (rotated square)
-            for (int y = 0; y < tex.height; y++)
-            {
-                for (int x = 0; x < tex.width; x++)
-                {
-                    float dx = Mathf.Abs(x - center.x);
-                    float dy = Mathf.Abs(y - center.y);
-
-                    if (dx / size + dy / (size * 1.3f) <= 1)
-                    {
-                        Color existing = tex.GetPixel(x, y);
-                        tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
-                    }
-                }
-            }
-        }
-
-        private void DrawFlame(Texture2D tex, Vector2 center, float size, Color color)
-        {
-            // Simplified flame shape
-            for (int y = 0; y < tex.height; y++)
-            {
-                for (int x = 0; x < tex.width; x++)
-                {
-                    float normalizedY = (y - center.y + size * 0.5f) / size;
-                    if (normalizedY < 0 || normalizedY > 1) continue;
-
-                    float maxWidth = size * 0.5f * (1 - normalizedY * 0.7f) * Mathf.Sin(normalizedY * Mathf.PI);
-                    maxWidth = Mathf.Max(maxWidth, size * 0.1f * (1 - normalizedY));
-
-                    if (Mathf.Abs(x - center.x) < maxWidth)
-                    {
-                        Color existing = tex.GetPixel(x, y);
-                        // Gradient from orange to yellow
-                        Color flameColor = Color.Lerp(color, new Color(1f, 0.95f, 0.4f), normalizedY);
-                        tex.SetPixel(x, y, Color.Lerp(existing, flameColor, color.a));
-                    }
-                }
-            }
-        }
-
-        private void DrawLightning(Texture2D tex, Vector2 center, float size, Color color)
-        {
-            // Lightning bolt - series of connected lines
-            Vector2[] points = {
-                center + new Vector2(size * 0.1f, size * 0.5f),
-                center + new Vector2(-size * 0.15f, size * 0.1f),
-                center + new Vector2(size * 0.15f, size * 0.05f),
-                center + new Vector2(-size * 0.1f, -size * 0.5f)
-            };
-
-            for (int i = 0; i < points.Length - 1; i++)
-            {
-                DrawLine(tex, points[i], points[i + 1], 8, color);
-            }
-        }
-
-        private void DrawSpade(Texture2D tex, Vector2 center, float size, Color color)
-        {
-            // Spade shape - inverted heart with stem
-            float circleRadius = size * 0.3f;
-            Vector2 leftCircle = center + new Vector2(-size * 0.22f, -size * 0.1f);
-            Vector2 rightCircle = center + new Vector2(size * 0.22f, -size * 0.1f);
-
-            for (int y = 0; y < tex.height; y++)
-            {
-                for (int x = 0; x < tex.width; x++)
-                {
-                    Vector2 p = new Vector2(x, y);
-                    float distLeft = Vector2.Distance(p, leftCircle);
-                    float distRight = Vector2.Distance(p, rightCircle);
-
-                    // Bottom circles
-                    if (distLeft <= circleRadius || distRight <= circleRadius)
-                    {
-                        Color existing = tex.GetPixel(x, y);
-                        tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
-                    }
-                    // Top point (inverted triangle)
-                    else if (y > center.y - size * 0.05f && y < center.y + size * 0.5f)
-                    {
-                        float width = (y - center.y + size * 0.05f) / (size * 0.55f) * size * 0.5f;
-                        width = Mathf.Max(0, size * 0.5f - width);
-                        if (Mathf.Abs(x - center.x) < width)
-                        {
-                            Color existing = tex.GetPixel(x, y);
-                            tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
-                        }
-                    }
-                    // Stem
-                    else if (y < center.y - size * 0.2f && y > center.y - size * 0.55f)
-                    {
-                        float stemWidth = size * 0.08f + (center.y - size * 0.2f - y) / (size * 0.35f) * size * 0.12f;
-                        if (Mathf.Abs(x - center.x) < stemWidth)
-                        {
-                            Color existing = tex.GetPixel(x, y);
-                            tex.SetPixel(x, y, Color.Lerp(existing, color, color.a));
-                        }
-                    }
-                }
-            }
-        }
-
-        private void ApplyPresetAvatar(AvatarPresetType type, Color baseColor)
-        {
-            // Create the preset texture at higher resolution for saving
-            int size = 256;
-            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            tex.filterMode = FilterMode.Bilinear;
-
-            Vector2 center = new Vector2(size / 2f, size / 2f);
-            float radius = size / 2f - 2;
-
-            // Fill with base color circle
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), center);
-                    if (dist <= radius)
-                    {
-                        float t = dist / radius;
-                        Color c = Color.Lerp(baseColor * 1.1f, baseColor * 0.8f, t * 0.5f);
-                        tex.SetPixel(x, y, c);
-                    }
-                    else
-                    {
-                        tex.SetPixel(x, y, Color.clear);
-                    }
-                }
-            }
-
-            // Draw icon overlay at 2x scale
-            DrawPresetIconScaled(tex, type, size);
-
-            tex.Apply();
+            Texture2D tex = Resources.Load<Texture2D>($"Avatars/{avatarName}");
+            if (tex == null) return;
 
             // Save to profile
             PlayerProfileManager.Instance?.SetAvatar(tex);
@@ -1132,67 +687,10 @@ namespace Lekha.UI
             {
                 UpdateAvatarDisplay(profile);
             }
-        }
 
-        private void DrawPresetIconScaled(Texture2D tex, AvatarPresetType type, int size)
-        {
-            // Same as DrawPresetIcon but for larger texture
-            Color iconColor = new Color(1f, 1f, 1f, 0.95f);
-            Color darkColor = new Color(0.1f, 0.1f, 0.1f, 0.9f);
-            Vector2 center = new Vector2(size / 2f, size / 2f);
-
-            // Scale factor (256/128 = 2)
-            float scale = size / 128f;
-
-            switch (type)
-            {
-                case AvatarPresetType.Smiley:
-                    DrawCircle(tex, new Vector2(size * 0.35f, size * 0.6f), 6 * scale, darkColor);
-                    DrawCircle(tex, new Vector2(size * 0.65f, size * 0.6f), 6 * scale, darkColor);
-                    DrawArc(tex, center, size * 0.25f, 200, 340, 4 * scale, darkColor);
-                    break;
-
-                case AvatarPresetType.Cool:
-                    DrawRect(tex, new Vector2(size * 0.2f, size * 0.55f), 25 * scale, 12 * scale, darkColor);
-                    DrawRect(tex, new Vector2(size * 0.55f, size * 0.55f), 25 * scale, 12 * scale, darkColor);
-                    DrawLine(tex, new Vector2(size * 0.45f, size * 0.6f), new Vector2(size * 0.55f, size * 0.6f), 3 * scale, darkColor);
-                    DrawArc(tex, center, size * 0.2f, 210, 330, 3 * scale, darkColor);
-                    break;
-
-                case AvatarPresetType.Happy:
-                    DrawCircle(tex, new Vector2(size * 0.35f, size * 0.6f), 5 * scale, darkColor);
-                    DrawCircle(tex, new Vector2(size * 0.65f, size * 0.6f), 5 * scale, darkColor);
-                    DrawArc(tex, new Vector2(center.x, center.y - 5 * scale), size * 0.3f, 200, 340, 5 * scale, darkColor);
-                    break;
-
-                case AvatarPresetType.Star:
-                    DrawStar(tex, center, size * 0.35f, 5, iconColor);
-                    break;
-
-                case AvatarPresetType.Heart:
-                    DrawHeart(tex, center, size * 0.35f, iconColor);
-                    break;
-
-                case AvatarPresetType.Crown:
-                    DrawCrown(tex, center, size * 0.4f, iconColor);
-                    break;
-
-                case AvatarPresetType.Diamond:
-                    DrawDiamond(tex, center, size * 0.35f, iconColor);
-                    break;
-
-                case AvatarPresetType.Flame:
-                    DrawFlame(tex, center, size * 0.35f, iconColor);
-                    break;
-
-                case AvatarPresetType.Lightning:
-                    DrawLightning(tex, center, size * 0.35f, iconColor);
-                    break;
-
-                case AvatarPresetType.Ace:
-                    DrawSpade(tex, center, size * 0.35f, iconColor);
-                    break;
-            }
+            // Save the selected avatar name for deterministic use
+            PlayerPrefs.SetString("SelectedAvatar", avatarName);
+            PlayerPrefs.Save();
         }
 
         private void CreatePopupButton(Transform parent, string text, Vector2 position, UnityEngine.Events.UnityAction onClick)
@@ -1237,10 +735,10 @@ namespace Lekha.UI
 
         private void TakePhoto()
         {
-            // Camera functionality requires NativeCamera plugin
-            // For now, create a random avatar
-            Debug.Log("Camera not available - using generated avatar");
-            CreateTestAvatar();
+            // Camera not available — apply a random bundled avatar
+            Debug.Log("Camera not available - using bundled avatar");
+            int idx = UnityEngine.Random.Range(0, BundledAvatarNames.Length);
+            ApplyBundledAvatar(BundledAvatarNames[idx]);
         }
 
         private void ChooseFromGallery()
@@ -1282,8 +780,8 @@ namespace Lekha.UI
 
         private void ShowPresetAvatarFallback()
         {
-            // Just apply a nice default preset avatar instead of a beige square
-            ApplyPresetAvatar(AvatarPresetType.Smiley, new Color(0.3f, 0.7f, 1f));
+            // Apply the first bundled avatar as default
+            ApplyBundledAvatar(BundledAvatarNames[0]);
         }
 
         private void LoadImageFromPath(string path)
