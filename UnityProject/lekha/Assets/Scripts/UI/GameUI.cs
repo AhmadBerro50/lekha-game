@@ -391,10 +391,32 @@ namespace Lekha.UI
                 new Vector2(0.5f, 0.5f), "Start Game", OnStartClicked);
             startButton.gameObject.SetActive(false); // Hidden - MainMenu handles starting
 
-            // Pass button - CENTER OF TABLE
+            // Pass button - CENTER OF TABLE (red color)
             passButton = CreateStyledButton(canvasTransform, "PassButton",
                 new Vector2(0.5f, 0.5f), "Pass Cards (0/3)", OnPassClicked);
-            passButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0, 40); // Slightly above center
+            passButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0, 40);
+            // Override to red
+            Image passImg = passButton.GetComponent<Image>();
+            Color passRed = new Color(0.85f, 0.20f, 0.25f, 1f);
+            Color passRedBright = new Color(0.95f, 0.30f, 0.35f, 1f);
+            Color passRedDark = new Color(0.65f, 0.12f, 0.18f, 1f);
+            if (passImg != null)
+            {
+                if (passButton.transition == Selectable.Transition.ColorTint)
+                {
+                    passImg.color = passRed;
+                    ColorBlock passColors = passButton.colors;
+                    passColors.normalColor = passRed;
+                    passColors.highlightedColor = passRedBright;
+                    passColors.pressedColor = passRedDark;
+                    passColors.selectedColor = passRed;
+                    passButton.colors = passColors;
+                }
+                else
+                {
+                    passImg.color = passRed;
+                }
+            }
             passButton.gameObject.SetActive(false);
 
             // Create pause button (top right corner)

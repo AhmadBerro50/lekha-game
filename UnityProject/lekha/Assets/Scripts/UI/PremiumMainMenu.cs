@@ -1174,7 +1174,7 @@ namespace Lekha.UI
             tmp.text = text;
             tmp.fontSize = isPrimary ? 26 : 20;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = isPrimary ? TextWhite : TextMuted;
+            tmp.color = isPrimary ? TextWhite : new Color(0.85f, 0.88f, 0.95f, 1f);
             tmp.fontStyle = FontStyles.Bold;
 
             return rect;
@@ -1195,19 +1195,19 @@ namespace Lekha.UI
             Color fillStart, fillEnd, borderColor, glowColor;
             if (isPrimary)
             {
-                // Vibrant gradient for primary button
-                fillStart = new Color(0.25f, 0.45f, 0.85f, 1f);  // Blue
-                fillEnd = new Color(0.35f, 0.55f, 0.95f, 1f);    // Lighter blue
-                borderColor = new Color(0.5f, 0.75f, 1f, 0.6f);  // Cyan border
-                glowColor = new Color(0.4f, 0.7f, 1f, 0.4f);     // Cyan glow
+                // Solid vibrant gradient for primary button
+                fillStart = new Color(0.20f, 0.42f, 0.80f, 1f);
+                fillEnd = new Color(0.30f, 0.55f, 0.92f, 1f);
+                borderColor = new Color(0.45f, 0.70f, 1f, 0.7f);
+                glowColor = new Color(0.35f, 0.60f, 1f, 0.3f);
             }
             else
             {
-                // Glass style for secondary button
-                fillStart = new Color(0.15f, 0.18f, 0.25f, 0.8f);
-                fillEnd = new Color(0.20f, 0.23f, 0.32f, 0.8f);
-                borderColor = new Color(1f, 1f, 1f, 0.2f);
-                glowColor = new Color(1f, 1f, 1f, 0.1f);
+                // Solid dark button — fully opaque, no glass transparency
+                fillStart = new Color(0.12f, 0.14f, 0.22f, 1f);
+                fillEnd = new Color(0.16f, 0.19f, 0.28f, 1f);
+                borderColor = new Color(0.40f, 0.50f, 0.65f, 0.5f);
+                glowColor = new Color(0.30f, 0.40f, 0.55f, 0.15f);
             }
 
             for (int y = 0; y < height; y++)
