@@ -818,18 +818,20 @@ namespace Lekha.UI
                 bg.sprite = ModernUITheme.Instance.CircleSprite;
             }
 
-            // Emoji sprite — fills most of the button
+            // Emoji sprite — fixed size, centered in button
             GameObject spriteObj = new GameObject("EmojiSprite");
             spriteObj.transform.SetParent(btnObj.transform, false);
             RectTransform spriteRect = spriteObj.AddComponent<RectTransform>();
-            spriteRect.anchorMin = new Vector2(0.12f, 0.12f);
-            spriteRect.anchorMax = new Vector2(0.88f, 0.88f);
-            spriteRect.sizeDelta = Vector2.zero;
+            spriteRect.anchorMin = new Vector2(0.5f, 0.5f);
+            spriteRect.anchorMax = new Vector2(0.5f, 0.5f);
+            spriteRect.pivot = new Vector2(0.5f, 0.5f);
+            spriteRect.sizeDelta = new Vector2(46, 46); // Fixed pixel size inside 60x60 button
             spriteRect.anchoredPosition = Vector2.zero;
 
             Image emojiImage = spriteObj.AddComponent<Image>();
             emojiImage.preserveAspect = true;
             emojiImage.raycastTarget = false;
+            emojiImage.type = Image.Type.Simple;
 
             // Load emoji sprite from local Resources (Fluent 3D PNGs)
             Sprite emojiSprite = EmojiWebLoader.GetSprite(emojiName);
