@@ -797,23 +797,30 @@ namespace Lekha.UI
             Image emojiImage = spriteObj.AddComponent<Image>();
             emojiImage.preserveAspect = true;
             emojiImage.raycastTarget = false;
-            emojiImage.gameObject.SetActive(false); // Hidden until CDN loads
 
-            // Unicode fallback label (shown while image downloads or if it fails)
-            GameObject fallbackObj = new GameObject("EmojiFallback");
-            fallbackObj.transform.SetParent(btnObj.transform, false);
-            RectTransform fallbackRect = fallbackObj.AddComponent<RectTransform>();
-            fallbackRect.anchorMin = Vector2.zero;
-            fallbackRect.anchorMax = Vector2.one;
-            fallbackRect.sizeDelta = Vector2.zero;
-            TextMeshProUGUI fallbackText = fallbackObj.AddComponent<TextMeshProUGUI>();
-            fallbackText.text = EmojiWebLoader.GetLabel(emojiName);
-            fallbackText.fontSize = 26f;
-            fallbackText.alignment = TextAlignmentOptions.Center;
-            fallbackText.raycastTarget = false;
-
-            // Kick off CDN download
-            EmojiWebLoader.LoadInto(emojiName, emojiImage);
+            // Load emoji sprite from local Resources (Fluent 3D PNGs)
+            Sprite emojiSprite = EmojiWebLoader.GetSprite(emojiName);
+            if (emojiSprite != null)
+            {
+                emojiImage.sprite = emojiSprite;
+                emojiImage.color = Color.white;
+            }
+            else
+            {
+                // Fallback: show Unicode character if sprite missing
+                emojiImage.gameObject.SetActive(false);
+                GameObject fallbackObj = new GameObject("EmojiFallback");
+                fallbackObj.transform.SetParent(btnObj.transform, false);
+                RectTransform fallbackRect = fallbackObj.AddComponent<RectTransform>();
+                fallbackRect.anchorMin = Vector2.zero;
+                fallbackRect.anchorMax = Vector2.one;
+                fallbackRect.sizeDelta = Vector2.zero;
+                TextMeshProUGUI fallbackText = fallbackObj.AddComponent<TextMeshProUGUI>();
+                fallbackText.text = EmojiWebLoader.GetLabel(emojiName);
+                fallbackText.fontSize = 26f;
+                fallbackText.alignment = TextAlignmentOptions.Center;
+                fallbackText.raycastTarget = false;
+            }
 
             // Button
             Button btn = btnObj.AddComponent<Button>();

@@ -306,6 +306,54 @@ namespace Lekha.UI
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
         }
 
+        // Bundled avatar names in Resources/Avatars/
+        private static readonly string[] AvatarNames = new string[]
+        {
+            "blackpanther", "doctorstrange", "goku", "ironman", "itachi", "naruto"
+        };
+        private static Sprite[] _avatarSprites;
+
+        /// <summary>
+        /// Load all avatar sprites from Resources once, then cache.
+        /// Works with both Sprite and Texture2D imports (JPG defaults to Texture2D).
+        /// </summary>
+        private static Sprite[] GetAvatarSprites()
+        {
+            if (_avatarSprites != null) return _avatarSprites;
+            _avatarSprites = new Sprite[AvatarNames.Length];
+            for (int i = 0; i < AvatarNames.Length; i++)
+            {
+                string path = $"Avatars/{AvatarNames[i]}";
+                // Try Sprite first (PNG with Sprite import mode)
+                Sprite s = Resources.Load<Sprite>(path);
+                if (s == null)
+                {
+                    // Fallback: load as Texture2D (JPG default import) and create Sprite
+                    Texture2D tex = Resources.Load<Texture2D>(path);
+                    if (tex != null)
+                    {
+                        s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
+                            new Vector2(0.5f, 0.5f), 100f);
+                    }
+                }
+                _avatarSprites[i] = s;
+            }
+            return _avatarSprites;
+        }
+
+        /// <summary>
+        /// Deterministic avatar index from player name — same name always gets the same avatar.
+        /// All clients compute the same result so no server sync needed.
+        /// </summary>
+        private static int GetAvatarIndex(string playerName)
+        {
+            if (string.IsNullOrEmpty(playerName)) return 0;
+            int hash = 0;
+            foreach (char c in playerName)
+                hash = hash * 31 + c;
+            return Mathf.Abs(hash) % AvatarNames.Length;
+        }
+
         private void LoadCustomAvatar()
         {
             // For the human player, check profile first
@@ -323,21 +371,17 @@ namespace Lekha.UI
                 }
             }
 
-            // Load DiceBear pixel-art avatar for every player
-            string seed = System.Uri.EscapeDataString(player.PlayerName);
-            string url = $"https://api.dicebear.com/8.x/pixel-art/png?seed={seed}&size=128";
-
-            WebResourceLoader.Instance.LoadSprite(url, $"avatar_{player.PlayerName}", null, sprite =>
+            // Pick a bundled avatar based on player name hash
+            var sprites = GetAvatarSprites();
+            int idx = GetAvatarIndex(player.PlayerName);
+            Sprite sprite = sprites[idx];
+            if (sprite != null && avatarImage != null)
             {
-                if (sprite != null && avatarImage != null)
-                {
-                    avatarImage.sprite = sprite;
-                    avatarImage.gameObject.SetActive(true);
-                    if (avatarText != null) avatarText.gameObject.SetActive(false);
-                    if (avatarBg  != null) avatarBg.gameObject.SetActive(false);
-                }
-                // If download fails, placeholder initial stays visible
-            });
+                avatarImage.sprite = sprite;
+                avatarImage.gameObject.SetActive(true);
+                if (avatarText != null) avatarText.gameObject.SetActive(false);
+                if (avatarBg  != null) avatarBg.gameObject.SetActive(false);
+            }
         }
 
         /// <summary>
@@ -1116,20 +1160,7 @@ namespace Lekha.UI
             shadow.effectColor = new Color(0, 0, 0, 0.6f);
             shadow.effectDistance = new Vector2(2, -2);
 
-            // Unicode text fallback (visible until CDN image arrives)
-            GameObject emojiTextObj = new GameObject("EmojiText");
-            emojiTextObj.transform.SetParent(currentEmojiDisplay.transform, false);
-            RectTransform emojiTextRect = emojiTextObj.AddComponent<RectTransform>();
-            emojiTextRect.anchorMin = Vector2.zero;
-            emojiTextRect.anchorMax = Vector2.one;
-            emojiTextRect.sizeDelta = Vector2.zero;
-            TextMeshProUGUI emojiText = emojiTextObj.AddComponent<TextMeshProUGUI>();
-            emojiText.text = EmojiWebLoader.GetLabel(emoji);
-            emojiText.fontSize = 32f;
-            emojiText.alignment = TextAlignmentOptions.Center;
-            emojiText.raycastTarget = false;
-
-            // Emoji sprite image (rendered above text so it covers the fallback once loaded)
+            // Emoji sprite image from local Resources
             GameObject spriteObj = new GameObject("EmojiSprite");
             spriteObj.transform.SetParent(currentEmojiDisplay.transform, false);
 
@@ -1142,10 +1173,13 @@ namespace Lekha.UI
             Image emojiImage = spriteObj.AddComponent<Image>();
             emojiImage.preserveAspect = true;
             emojiImage.raycastTarget = false;
-            emojiImage.gameObject.SetActive(false); // Hidden until CDN loads
 
-            // Kick off CDN download — image will show when ready
-            EmojiWebLoader.LoadInto(emoji, emojiImage);
+            Sprite emojiSprite = EmojiWebLoader.GetSprite(emoji);
+            if (emojiSprite != null)
+            {
+                emojiImage.sprite = emojiSprite;
+                emojiImage.color = Color.white;
+            }
 
             // Canvas group for fade
             CanvasGroup canvasGroup = currentEmojiDisplay.AddComponent<CanvasGroup>();
