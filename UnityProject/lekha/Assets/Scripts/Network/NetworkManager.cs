@@ -48,6 +48,7 @@ namespace Lekha.Network
         PlayerDisconnected,
         PlayerReconnected,
         SelectPosition,
+        DeselectPosition,
         PositionSelected,
         SetReady,
         StartGame,
@@ -1276,6 +1277,24 @@ namespace Lekha.Network
 
             SendMessage(new NetworkMessage(NetworkMessageType.SelectPosition, position.ToString()));
             Debug.Log($"[NetworkManager] SelectPosition sent: {position}");
+        }
+
+        /// <summary>
+        /// Deselect current position (move back to waiting area)
+        /// </summary>
+        public void DeselectPosition()
+        {
+            if (CurrentRoom == null)
+                return;
+
+            SendMessage(new NetworkMessage(NetworkMessageType.DeselectPosition, ""));
+            Debug.Log($"[NetworkManager] DeselectPosition sent");
+
+            // Clear local position immediately for responsive UI
+            if (LocalPlayer != null)
+            {
+                LocalPlayer.AssignedPosition = null;
+            }
         }
 
         /// <summary>
