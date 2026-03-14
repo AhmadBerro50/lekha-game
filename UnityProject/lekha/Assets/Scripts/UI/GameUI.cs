@@ -417,6 +417,9 @@ namespace Lekha.UI
                     passImg.color = passRed;
                 }
             }
+            // White text on red button
+            var passText = passButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (passText != null) passText.color = Color.white;
             passButton.gameObject.SetActive(false);
 
             // Create pause button (top right corner)
