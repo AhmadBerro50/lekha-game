@@ -825,7 +825,7 @@ namespace Lekha.UI
             overlayRect.sizeDelta = Vector2.zero;
 
             Image overlayBg = disconnectOverlay.AddComponent<Image>();
-            overlayBg.color = new Color(0.05f, 0.05f, 0.08f, 0.75f);
+            overlayBg.color = new Color(0.1f, 0.05f, 0.0f, 0.85f); // Darker with orange tint for visibility
             overlayBg.raycastTarget = false;
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
             {
@@ -843,11 +843,11 @@ namespace Lekha.UI
             textRect.sizeDelta = Vector2.zero;
 
             disconnectText = textObj.AddComponent<TextMeshProUGUI>();
-            disconnectText.text = "DISCONNECTED";
-            disconnectText.fontSize = 16;
+            disconnectText.text = "DISCONNECTED\n<size=12>Waiting...</size>";
+            disconnectText.fontSize = 20;
             disconnectText.fontStyle = FontStyles.Bold;
             disconnectText.alignment = TextAlignmentOptions.Center;
-            disconnectText.color = new Color(1f, 0.65f, 0.2f, 1f); // Orange
+            disconnectText.color = new Color(1f, 0.5f, 0.1f, 1f); // Bright orange
             disconnectText.raycastTarget = false;
 
             disconnectOverlay.SetActive(false);
@@ -893,6 +893,9 @@ namespace Lekha.UI
             botBadge.SetActive(false);
         }
 
+        private Coroutine disconnectPulseCoroutine;
+        private Coroutine reconnectFlashCoroutine;
+
         public void SetDisconnected(bool disconnected)
         {
             isDisconnected = disconnected;
@@ -903,10 +906,72 @@ namespace Lekha.UI
             // Gray out avatar ring when disconnected
             if (avatarRing != null)
                 avatarRing.color = disconnected ? new Color(0.4f, 0.4f, 0.4f, 0.6f) : GoldTrim;
+
+            // Start/stop pulsing animation for disconnect text
+            if (disconnected)
+            {
+                if (disconnectPulseCoroutine == null)
+                    disconnectPulseCoroutine = StartCoroutine(PulseDisconnectText());
+            }
+            else
+            {
+                if (disconnectPulseCoroutine != null)
+                {
+                    StopCoroutine(disconnectPulseCoroutine);
+                    disconnectPulseCoroutine = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Brief green flash on the avatar ring when a player reconnects
+        /// </summary>
+        public void FlashReconnected()
+        {
+            if (reconnectFlashCoroutine != null)
+                StopCoroutine(reconnectFlashCoroutine);
+            reconnectFlashCoroutine = StartCoroutine(ReconnectFlashCoroutine());
+        }
+
+        private System.Collections.IEnumerator PulseDisconnectText()
+        {
+            float t = 0f;
+            while (isDisconnected && disconnectText != null)
+            {
+                t += Time.deltaTime * 2f;
+                float alpha = Mathf.Lerp(0.5f, 1f, (Mathf.Sin(t) + 1f) * 0.5f);
+                disconnectText.color = new Color(1f, 0.5f, 0.1f, alpha);
+                yield return null;
+            }
+            disconnectPulseCoroutine = null;
+        }
+
+        private System.Collections.IEnumerator ReconnectFlashCoroutine()
+        {
+            Color greenFlash = new Color(0.2f, 0.9f, 0.4f, 1f);
+            if (avatarRing != null)
+                avatarRing.color = greenFlash;
+
+            // Flash green for 1.5 seconds then return to gold
+            float elapsed = 0f;
+            while (elapsed < 1.5f)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / 1.5f;
+                if (avatarRing != null)
+                    avatarRing.color = Color.Lerp(greenFlash, GoldTrim, t);
+                yield return null;
+            }
+
+            if (avatarRing != null)
+                avatarRing.color = GoldTrim;
+            reconnectFlashCoroutine = null;
         }
 
         public void SetBotReplaced(bool replaced)
         {
+            // Bot replacement should not happen in online games anymore
+            // Method kept for backward compatibility
             isBotReplaced = replaced;
 
             if (botBadge != null)

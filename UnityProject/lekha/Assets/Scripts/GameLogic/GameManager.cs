@@ -1011,11 +1011,18 @@ namespace Lekha.GameLogic
 
         public void ReplacePlayerWithBot(PlayerPosition pos)
         {
+            // WARNING: This should never be called in online games — we always wait for reconnection
+            Debug.LogWarning($"[GameManager] ReplacePlayerWithBot called for {pos} — this should not happen in online games!");
+            if (isOnlineGame)
+            {
+                Debug.LogWarning("[GameManager] Ignoring bot replacement in online game — always waiting for reconnect");
+                return;
+            }
             disconnectedPositions.Remove(pos);
             botReplacedPositions.Add(pos);
             Player player = GetPlayerAtPosition(pos);
             if (player != null) player.SetIsHuman(false);
-            Debug.Log($"[GameManager] Player at {pos} replaced by bot");
+            Debug.Log($"[GameManager] Player at {pos} replaced by bot (offline game only)");
         }
 
         public bool IsPlayerDisconnectedOrBot(PlayerPosition pos)
@@ -1027,7 +1034,10 @@ namespace Lekha.GameLogic
         {
             if (!isOnlineGame) return false;
             if (NetworkGameSync.Instance == null || !NetworkGameSync.Instance.IsHost) return false;
-            return IsPlayerDisconnectedOrBot(pos);
+            // Only play AI for actual bots (offline game), NOT for disconnected players in online games
+            // Disconnected players should wait for reconnection
+            if (disconnectedPositions.Contains(pos)) return false;
+            return botReplacedPositions.Contains(pos);
         }
 
         public IReadOnlyCollection<PlayerPosition> DisconnectedPositions => disconnectedPositions;

@@ -245,19 +245,19 @@ namespace Lekha.UI
             switch (primary.Type)
             {
                 case NotificationType.Disconnected:
-                    int seconds = Mathf.CeilToInt(primary.TimeRemaining);
-                    messageText.text = $"{primary.PlayerName} disconnected. Reconnecting... ({seconds}s)";
+                    messageText.text = $"\u26a0 {primary.PlayerName} disconnected \u2014 waiting for reconnection...";
                     messageText.color = DisconnectColor;
                     SetOutlineColor(DisconnectColor);
                     break;
 
                 case NotificationType.Reconnected:
-                    messageText.text = $"{primary.PlayerName} reconnected!";
+                    messageText.text = $"\u2713 {primary.PlayerName} reconnected!";
                     messageText.color = ReconnectColor;
                     SetOutlineColor(ReconnectColor);
                     break;
 
                 case NotificationType.BotReplaced:
+                    // Should not happen anymore — kept for safety
                     messageText.text = $"{primary.PlayerName} replaced by bot";
                     messageText.color = BotColor;
                     SetOutlineColor(BotColor);

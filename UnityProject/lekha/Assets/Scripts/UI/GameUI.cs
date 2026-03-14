@@ -124,6 +124,15 @@ namespace Lekha.UI
                 // Level 1 (6s): Gentle nudge — don't clear locks, just re-trigger the action
                 if (timeSinceLastAction <= deepStuck)
                 {
+                    // If it's a disconnected player's turn in an online game, just show waiting message
+                    if (GameManager.Instance.IsOnlineGame && GameManager.Instance.DisconnectedPositions.Contains(currentPlayer.Position))
+                    {
+                        if (instructionText != null)
+                            instructionText.text = $"Waiting for {currentPlayer.PlayerName} to reconnect...";
+                        lastActionTime = Time.time; // Reset watchdog to avoid escalation
+                        continue;
+                    }
+
                     Debug.LogWarning($"[Watchdog] Stuck {timeSinceLastAction:F0}s — gentle nudge for {currentPlayer.PlayerName}");
                     if (isLocalTurn)
                     {
@@ -143,6 +152,15 @@ namespace Lekha.UI
                 // Level 2 (12s): Aggressive — clear cooldown only, re-trigger
                 if (timeSinceLastAction <= forceReset)
                 {
+                    // If it's a disconnected player's turn in an online game, just wait
+                    if (GameManager.Instance.IsOnlineGame && GameManager.Instance.DisconnectedPositions.Contains(currentPlayer.Position))
+                    {
+                        if (instructionText != null)
+                            instructionText.text = $"Waiting for {currentPlayer.PlayerName} to reconnect...";
+                        lastActionTime = Time.time;
+                        continue;
+                    }
+
                     Debug.LogWarning($"[Watchdog] Deep stuck {timeSinceLastAction:F0}s — clearing cooldown");
                     nextAllowedPlayTime = 0f;
 
@@ -167,6 +185,15 @@ namespace Lekha.UI
                 }
 
                 // Level 3 (20s): Nuclear — clear ALL locks and force action
+                // But NOT for disconnected players in online games
+                if (GameManager.Instance.IsOnlineGame && GameManager.Instance.DisconnectedPositions.Contains(currentPlayer.Position))
+                {
+                    if (instructionText != null)
+                        instructionText.text = $"Waiting for {currentPlayer.PlayerName} to reconnect...";
+                    lastActionTime = Time.time;
+                    continue;
+                }
+
                 Debug.LogError($"[Watchdog] NUCLEAR reset after {timeSinceLastAction:F0}s stuck");
                 isProcessingPlay = false;
                 nextAllowedPlayTime = 0f;
@@ -2473,12 +2500,13 @@ namespace Lekha.UI
                 HighlightPlayableCards();
             }
 
-            // If host and the timed-out player is disconnected/bot, trigger AI play
-            if (NetworkGameSync.Instance != null && NetworkGameSync.Instance.IsHost
-                && GameManager.Instance.IsPlayerDisconnectedOrBot(timedOutPos))
+            // If the timed-out player is disconnected, show waiting message instead of triggering AI
+            if (GameManager.Instance.DisconnectedPositions.Contains(timedOutPos))
             {
-                Debug.Log($"[GameUI] TurnTimeout: host triggering AI play for disconnected/bot {timedOutPos}");
-                TriggerDisconnectedPlayerAI();
+                string playerName = GameManager.Instance.GetPlayerDisplayName(timedOutPos);
+                Debug.Log($"[GameUI] TurnTimeout: {playerName} is disconnected, showing waiting message");
+                if (instructionText != null)
+                    instructionText.text = $"Waiting for {playerName} to reconnect...";
             }
 
             ResetWatchdogTimer();
@@ -2486,10 +2514,28 @@ namespace Lekha.UI
 
         /// <summary>
         /// Trigger AI play for a disconnected/bot player. Called by NetworkGameSync.
+        /// In online games, we no longer play AI for disconnected players — we wait for reconnection.
+        /// This method is kept for offline game compatibility only.
         /// </summary>
         public void TriggerDisconnectedPlayerAI()
         {
             if (GameManager.Instance == null) return;
+
+            // In online games, don't play AI for disconnected players — wait for reconnection
+            if (GameManager.Instance.IsOnlineGame)
+            {
+                Player current = GameManager.Instance.CurrentPlayer;
+                if (current != null && GameManager.Instance.DisconnectedPositions.Contains(current.Position))
+                {
+                    string playerName = current.PlayerName;
+                    Debug.Log($"[GameUI] TriggerDisconnectedPlayerAI: {playerName} is disconnected, waiting for reconnect instead of AI play");
+                    if (instructionText != null)
+                        instructionText.text = $"Waiting for {playerName} to reconnect...";
+                    ResetWatchdogTimer();
+                    return;
+                }
+            }
+
             if (GameManager.Instance.CurrentState == GameState.PlayingTricks)
             {
                 // Cancel any existing turn setup or AI play first
@@ -3141,6 +3187,10 @@ namespace Lekha.UI
                 {
                     instructionText.text = "Your turn - tap a card to play";
                 }
+                else if (GameManager.Instance.IsOnlineGame && GameManager.Instance.DisconnectedPositions.Contains(current.Position))
+                {
+                    instructionText.text = $"Waiting for {current.PlayerName} to reconnect...";
+                }
                 else
                 {
                     instructionText.text = $"{current.PlayerName}'s turn...";
@@ -3221,39 +3271,45 @@ namespace Lekha.UI
 
         private void OnPlayerDisconnectedUI(PlayerPosition pos, string playerName, float timeoutSeconds)
         {
-            // Update player info panel
+            // Update player info panel with prominent disconnect indicator
             if (playerInfoPanels.TryGetValue(pos, out PlayerInfoPanel panel))
             {
                 panel.SetDisconnected(true);
             }
 
-            // Show notification banner
-            DisconnectNotification.Instance?.ShowDisconnected(pos, playerName, timeoutSeconds);
+            // Show persistent centered banner — no countdown, just "waiting for reconnection"
+            // Pass a very large timeout so the banner stays visible until reconnect
+            DisconnectNotification.Instance?.ShowDisconnected(pos, playerName, 86400f);
+
+            // If it's this player's turn, show waiting message in instruction text
+            if (GameManager.Instance != null && GameManager.Instance.CurrentPlayer != null
+                && GameManager.Instance.CurrentPlayer.Position == pos)
+            {
+                if (instructionText != null)
+                    instructionText.text = $"Waiting for {playerName} to reconnect...";
+            }
         }
 
         private void OnPlayerReconnectedUI(PlayerPosition pos, string playerName)
         {
-            // Update player info panel
+            // Update player info panel — clear disconnect state with brief green flash
             if (playerInfoPanels.TryGetValue(pos, out PlayerInfoPanel panel))
             {
                 panel.SetDisconnected(false);
+                panel.FlashReconnected();
             }
 
-            // Show reconnected notification
+            // Show brief green reconnected notification (auto-dismisses after 3s)
             DisconnectNotification.Instance?.ShowReconnected(pos, playerName);
+
+            // Update instruction text if needed
+            UpdateInstructionText();
         }
 
         private void OnBotReplacedUI(PlayerPosition pos, string playerName)
         {
-            // Update player info panel
-            if (playerInfoPanels.TryGetValue(pos, out PlayerInfoPanel panel))
-            {
-                panel.SetDisconnected(false);
-                panel.SetBotReplaced(true);
-            }
-
-            // Show bot replaced notification
-            DisconnectNotification.Instance?.ShowBotReplaced(pos, playerName);
+            // Bot replacement should never happen now — we always wait for reconnection
+            Debug.LogWarning($"[GameUI] OnBotReplacedUI called for {playerName} at {pos} — this should not happen!");
         }
     }
 }
