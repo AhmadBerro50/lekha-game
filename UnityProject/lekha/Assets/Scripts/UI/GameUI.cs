@@ -746,9 +746,9 @@ namespace Lekha.UI
             emojiPanelCanvasGroup.blocksRaycasts = false;
             emojiPanelCanvasGroup.interactable = false;
 
-            // Dark glassmorphism background
+            // Dark solid background
             Image panelBg = emojiPanelObj.AddComponent<Image>();
-            panelBg.color = new Color(0.08f, 0.10f, 0.15f, 0.95f);
+            panelBg.color = new Color(0.05f, 0.06f, 0.10f, 0.95f);
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
             {
                 panelBg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
@@ -809,26 +809,21 @@ namespace Lekha.UI
             RectTransform btnRect = btnObj.AddComponent<RectTransform>();
             btnRect.sizeDelta = new Vector2(60, 60);
 
-            // Background with accent color
+            // Simple dark background — no colored circles
             Image bg = btnObj.AddComponent<Image>();
-            bg.color = new Color(accentColor.r * 0.3f, accentColor.g * 0.3f, accentColor.b * 0.3f, 0.95f);
+            bg.color = new Color(0.10f, 0.10f, 0.14f, 0.9f);
             bg.raycastTarget = true;
             if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
             {
                 bg.sprite = ModernUITheme.Instance.CircleSprite;
             }
 
-            // Colored outline
-            Outline outline = btnObj.AddComponent<Outline>();
-            outline.effectColor = new Color(accentColor.r, accentColor.g, accentColor.b, 0.9f);
-            outline.effectDistance = new Vector2(2, -2);
-
-            // Emoji sprite
+            // Emoji sprite — fills most of the button
             GameObject spriteObj = new GameObject("EmojiSprite");
             spriteObj.transform.SetParent(btnObj.transform, false);
             RectTransform spriteRect = spriteObj.AddComponent<RectTransform>();
-            spriteRect.anchorMin = new Vector2(0.1f, 0.1f);
-            spriteRect.anchorMax = new Vector2(0.9f, 0.9f);
+            spriteRect.anchorMin = new Vector2(0.12f, 0.12f);
+            spriteRect.anchorMax = new Vector2(0.88f, 0.88f);
             spriteRect.sizeDelta = Vector2.zero;
             spriteRect.anchoredPosition = Vector2.zero;
 
@@ -845,7 +840,6 @@ namespace Lekha.UI
             }
             else
             {
-                // Fallback: show Unicode character if sprite missing
                 emojiImage.gameObject.SetActive(false);
                 GameObject fallbackObj = new GameObject("EmojiFallback");
                 fallbackObj.transform.SetParent(btnObj.transform, false);
