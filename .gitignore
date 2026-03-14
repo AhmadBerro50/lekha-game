@@ -89,3 +89,16 @@ node_modules/
 
 # Claude cache
 .claude/
+
+# IDE
+.vscode/
+
+# Downloaded SDKs / archives
+Agora-RTC-Plugin/
+*.zip
+
+# Unity crash recovery
+**/Assets/_Recovery/
+
+# One-off scripts
+generate_icon.py
