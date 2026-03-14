@@ -135,28 +135,43 @@ namespace Lekha.Network
         /// </summary>
         public void JoinChannel(string roomId, string position = null)
         {
+            if (string.IsNullOrEmpty(roomId))
+            {
+                Debug.LogWarning("[VoiceChatManager] JoinChannel called with null/empty roomId");
+                return;
+            }
+
             if (!isInitialized)
             {
                 if (!Initialize()) return;
             }
 
-            // If same channel already active or being joined, skip
-            if ((isJoining || isInChannel) && currentChannelName == roomId) return;
+            // If already in this exact channel and connected, skip
+            if (isInChannel && currentChannelName == roomId)
+            {
+                Debug.Log($"[VoiceChatManager] Already in channel {roomId}, skipping join");
+                return;
+            }
 
-            // Different channel — leave current first
+            // Leave current channel first (handles isJoining stuck state too)
             if (isJoining || isInChannel)
             {
                 LeaveChannel();
             }
 
             currentChannelName = roomId;
-
+            lastRoomId = roomId;
+            lastPosition = position;
             uint uid = PositionToUid(position);
             isJoining = true;
+
             int result = rtcEngine.JoinChannel("", roomId, "", uid);
             if (result != 0)
             {
-                Debug.LogError($"[VoiceChatManager] JoinChannel failed: {result}");
+                // CRITICAL: Reset isJoining on failure so we can retry
+                isJoining = false;
+                currentChannelName = null;
+                Debug.LogError($"[VoiceChatManager] JoinChannel failed with code {result}. Will retry on next call.");
                 OnVoiceChatError?.Invoke($"Join failed: {result}");
             }
             else
@@ -307,6 +322,35 @@ namespace Lekha.Network
             isJoining = false;
             OnVoiceChatError?.Invoke($"Error {err}: {msg}");
         }
+
+        // Auto-rejoin tracking
+        private string lastRoomId;
+        private string lastPosition;
+        private float rejoinCooldown = 0f;
+
+        internal void HandleConnectionLost()
+        {
+            Debug.LogWarning("[VoiceChatManager] Connection lost — will auto-rejoin");
+            isInChannel = false;
+            isJoining = false;
+            // Store for rejoin
+            lastRoomId = currentChannelName;
+            rejoinCooldown = 3f; // Wait 3 seconds before rejoin
+        }
+
+        private void Update()
+        {
+            if (rejoinCooldown > 0)
+            {
+                rejoinCooldown -= Time.deltaTime;
+                if (rejoinCooldown <= 0 && !isInChannel && !isJoining && !string.IsNullOrEmpty(lastRoomId))
+                {
+                    Debug.Log($"[VoiceChatManager] Auto-rejoining channel: {lastRoomId}");
+                    JoinChannel(lastRoomId, lastPosition);
+                    lastRoomId = null;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -349,6 +393,22 @@ namespace Lekha.Network
         public override void OnLeaveChannel(RtcConnection connection, RtcStats stats)
         {
             Debug.Log("[VoiceChatManager] OnLeaveChannel callback");
+        }
+
+        public override void OnConnectionLost(RtcConnection connection)
+        {
+            Debug.LogWarning("[VoiceChatManager] OnConnectionLost callback");
+            manager.HandleConnectionLost();
+        }
+
+        public override void OnConnectionStateChanged(RtcConnection connection, CONNECTION_STATE_TYPE state, CONNECTION_CHANGED_REASON_TYPE reason)
+        {
+            Debug.Log($"[VoiceChatManager] Connection state: {state}, reason: {reason}");
+            if (state == CONNECTION_STATE_TYPE.CONNECTION_STATE_FAILED ||
+                state == CONNECTION_STATE_TYPE.CONNECTION_STATE_DISCONNECTED)
+            {
+                manager.HandleConnectionLost();
+            }
         }
     }
 }

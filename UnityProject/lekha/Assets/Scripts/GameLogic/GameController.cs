@@ -114,11 +114,12 @@ namespace Lekha.GameLogic
                 GameUI.Instance.Reinitialize();
             }
 
-            // Check if this is an online game by looking at NetworkManager state
-            // This is more reliable than NetworkGameSync.IsOnlineGame due to event timing
+            // Check if this is an online game — accept both InGame and InLobby states
+            // because the transition may not have completed when this fires
             bool isOnlineGame = NetworkManager.Instance != null &&
-                                NetworkManager.Instance.State == ConnectionState.InGame &&
-                                NetworkManager.Instance.CurrentRoom != null;
+                                NetworkManager.Instance.CurrentRoom != null &&
+                                (NetworkManager.Instance.State == ConnectionState.InGame ||
+                                 NetworkManager.Instance.State == ConnectionState.InLobby);
 
             bool isHost = NetworkManager.Instance?.LocalPlayer?.IsHost ?? false;
 
@@ -202,13 +203,37 @@ namespace Lekha.GameLogic
         private void JoinVoiceChat()
         {
             var roomId = NetworkManager.Instance?.CurrentRoom?.RoomId;
-            if (string.IsNullOrEmpty(roomId)) return;
+            if (string.IsNullOrEmpty(roomId))
+            {
+                Debug.LogWarning("[GameController] JoinVoiceChat: no room ID available");
+                return;
+            }
 
             if (VoiceChatManager.Instance != null)
             {
                 string position = NetworkManager.Instance?.LocalPlayer?.AssignedPosition ?? "South";
-                VoiceChatManager.Instance.JoinChannel(roomId, position);
                 Debug.Log($"[GameController] Joining voice channel for room: {roomId}, position: {position}");
+                VoiceChatManager.Instance.JoinChannel(roomId, position);
+            }
+            else
+            {
+                Debug.LogWarning("[GameController] VoiceChatManager.Instance is null — cannot join voice");
+            }
+        }
+
+        /// <summary>
+        /// Called to ensure voice chat is connected. Safe to call multiple times.
+        /// </summary>
+        public void EnsureVoiceChat()
+        {
+            if (VoiceChatManager.Instance == null) return;
+            if (VoiceChatManager.Instance.IsInChannel) return;
+
+            var roomId = NetworkManager.Instance?.CurrentRoom?.RoomId;
+            if (!string.IsNullOrEmpty(roomId))
+            {
+                Debug.Log("[GameController] EnsureVoiceChat: voice not connected, rejoining...");
+                JoinVoiceChat();
             }
         }
 
