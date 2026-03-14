@@ -59,13 +59,14 @@ namespace Lekha.UI
                 return cached;
 
             string path = $"Emojis/{emojiName}";
-            Sprite sprite = Resources.Load<Sprite>(path);
-            if (sprite == null)
+            // Try loading as Texture2D first (most reliable — works regardless of import mode)
+            Texture2D tex = Resources.Load<Texture2D>(path);
+            Sprite sprite = null;
+            if (tex != null)
             {
-                Texture2D tex = Resources.Load<Texture2D>(path);
-                if (tex != null)
-                    sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
-                        new Vector2(0.5f, 0.5f), 100f);
+                // Use high pixelsPerUnit so the 256x256 texture scales down properly in UI
+                sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
+                    new Vector2(0.5f, 0.5f), tex.width);
             }
 
             if (sprite != null)

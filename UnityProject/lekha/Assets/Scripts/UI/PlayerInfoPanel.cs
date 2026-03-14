@@ -1165,14 +1165,16 @@ namespace Lekha.UI
             spriteObj.transform.SetParent(currentEmojiDisplay.transform, false);
 
             RectTransform spriteRect = spriteObj.AddComponent<RectTransform>();
-            spriteRect.anchorMin = new Vector2(0.1f, 0.1f);
-            spriteRect.anchorMax = new Vector2(0.9f, 0.9f);
-            spriteRect.sizeDelta = Vector2.zero;
+            spriteRect.anchorMin = new Vector2(0.5f, 0.5f);
+            spriteRect.anchorMax = new Vector2(0.5f, 0.5f);
+            spriteRect.pivot = new Vector2(0.5f, 0.5f);
+            spriteRect.sizeDelta = new Vector2(54, 54); // Fixed size inside 70x70 emoji display
             spriteRect.anchoredPosition = Vector2.zero;
 
             Image emojiImage = spriteObj.AddComponent<Image>();
             emojiImage.preserveAspect = true;
             emojiImage.raycastTarget = false;
+            emojiImage.type = Image.Type.Simple;
 
             Sprite emojiSprite = EmojiWebLoader.GetSprite(emoji);
             if (emojiSprite != null)
