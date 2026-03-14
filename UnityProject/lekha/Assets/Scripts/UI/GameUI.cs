@@ -1649,6 +1649,9 @@ namespace Lekha.UI
                         Debug.Log($"[OnPassClicked] Sent {localCards.Count} cards from {fromPos} to {toPos}");
                     }
 
+                    // Show passed cards above recipient panel
+                    ShowPassedCardsOnRecipient(toPos, localCards);
+
                     // Notify GameManager that local player has submitted their pass
                     GameManager.Instance.NotifyLocalPassSubmitted();
 
@@ -1664,6 +1667,11 @@ namespace Lekha.UI
                 else
                 {
                     // Local game with bots - execute pass phase
+
+                    // Show passed cards above recipient panel before executing
+                    PlayerPosition toPos = Player.GetPlayerToRight(localPlayer.Position);
+                    ShowPassedCardsOnRecipient(toPos, localCards);
+
                     var cardsToPass = new Dictionary<Player, List<Card>>();
                     cardsToPass[localPlayer] = localCards;
 
@@ -1683,6 +1691,18 @@ namespace Lekha.UI
                     isPassPhase = false;
                     passButton.gameObject.SetActive(false);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Show the passed cards as small card images above the recipient player's info panel.
+        /// </summary>
+        private void ShowPassedCardsOnRecipient(PlayerPosition recipientPos, List<Card> cards)
+        {
+            if (playerInfoPanels.TryGetValue(recipientPos, out PlayerInfoPanel panel))
+            {
+                panel.ShowPassedCards(cards);
+                Debug.Log($"[ShowPassedCardsOnRecipient] Showing {cards.Count} passed cards above {recipientPos} panel");
             }
         }
 

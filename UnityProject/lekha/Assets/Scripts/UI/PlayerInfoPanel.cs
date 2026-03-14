@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -51,6 +52,13 @@ namespace Lekha.UI
         private int displayedTotalPoints = 0;
         private Coroutine roundScoreCoroutine;
         private Coroutine totalScoreCoroutine;
+
+        // Turn badge
+        private GameObject turnBadge;
+        private TextMeshProUGUI turnBadgeText;
+
+        // Passed cards display
+        private Coroutine passedCardsCoroutine;
 
         // State
         private bool isTurnActive = false;
@@ -116,6 +124,9 @@ namespace Lekha.UI
 
             // Special cards indicator (Queen of Spades, 10 of Diamonds)
             CreateSpecialCardsIndicator();
+
+            // Turn badge (hidden by default)
+            CreateTurnBadge();
 
             // Disconnect overlay + BOT badge (hidden by default)
             CreateDisconnectOverlay();
@@ -588,7 +599,7 @@ namespace Lekha.UI
             containerRect.anchorMax = new Vector2(0.5f, 0f);
             containerRect.pivot = new Vector2(0.5f, 1f);
             containerRect.anchoredPosition = new Vector2(0, -2);
-            containerRect.sizeDelta = new Vector2(110, 40);
+            containerRect.sizeDelta = new Vector2(110, 55);
 
             // Add canvas to ensure it renders on top
             Canvas containerCanvas = specialCardsContainer.AddComponent<Canvas>();
@@ -604,24 +615,26 @@ namespace Lekha.UI
             layout.childForceExpandHeight = false;
             layout.padding = new RectOffset(5, 5, 5, 5);
 
-            // Queen of Spades indicator (Blue +2) - BIGGER AND CLEARER
+            // Queen of Spades indicator (Blue Draw 2) - card image
             queenOfSpadesIcon = CreateSpecialCardIcon(specialCardsContainer.transform, "QueenOfSpades",
-                new Color(0.3f, 0.5f, 0.95f, 1f), "+13", new Color(0.6f, 0.1f, 0.8f, 1f)); // Blue with purple accent
+                new Color(0.3f, 0.5f, 0.95f, 1f), "+13", new Color(0.6f, 0.1f, 0.8f, 1f),
+                "Cards/Blue/Blue_Draw_2"); // Blue with purple accent
             queenOfSpadesIcon.gameObject.SetActive(false);
 
-            // 10 of Diamonds indicator (Yellow 0) - BIGGER AND CLEARER
+            // 10 of Diamonds indicator (Yellow 0) - card image
             tenOfDiamondsIcon = CreateSpecialCardIcon(specialCardsContainer.transform, "TenOfDiamonds",
-                new Color(1f, 0.85f, 0.2f, 1f), "×0", new Color(1f, 0.5f, 0.1f, 1f)); // Yellow with orange accent
+                new Color(1f, 0.85f, 0.2f, 1f), "\u00d70", new Color(1f, 0.5f, 0.1f, 1f),
+                "Cards/Yellow/Yellow_0"); // Yellow with orange accent
             tenOfDiamondsIcon.gameObject.SetActive(false);
         }
 
-        private Image CreateSpecialCardIcon(Transform parent, string name, Color bgColor, string label, Color accentColor)
+        private Image CreateSpecialCardIcon(Transform parent, string name, Color bgColor, string label, Color accentColor, string cardSpritePath = null)
         {
             GameObject iconObj = new GameObject(name);
             iconObj.transform.SetParent(parent, false);
 
             RectTransform iconRect = iconObj.AddComponent<RectTransform>();
-            iconRect.sizeDelta = new Vector2(36, 36);
+            iconRect.sizeDelta = new Vector2(30, 45);
 
             // Background with glass effect
             Image bg = iconObj.AddComponent<Image>();
@@ -642,30 +655,61 @@ namespace Lekha.UI
             shadow.effectColor = new Color(0, 0, 0, 0.6f);
             shadow.effectDistance = new Vector2(2, -2);
 
-            // Label text - BIGGER
-            GameObject textObj = new GameObject("Label");
-            textObj.transform.SetParent(iconObj.transform, false);
+            // Try to load card sprite image
+            bool spriteLoaded = false;
+            if (!string.IsNullOrEmpty(cardSpritePath))
+            {
+                Texture2D tex = Resources.Load<Texture2D>(cardSpritePath);
+                if (tex != null)
+                {
+                    Sprite cardSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), tex.width);
 
-            RectTransform textRect = textObj.AddComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.sizeDelta = Vector2.zero;
+                    // Card face image filling the icon
+                    GameObject cardImgObj = new GameObject("CardFace");
+                    cardImgObj.transform.SetParent(iconObj.transform, false);
 
-            TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
-            tmp.text = label;
-            tmp.fontSize = 16;
-            tmp.fontStyle = FontStyles.Bold;
-            tmp.color = Color.white;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.outlineWidth = 0.15f;
-            tmp.outlineColor = new Color(0, 0, 0, 0.7f);
+                    RectTransform cardImgRect = cardImgObj.AddComponent<RectTransform>();
+                    cardImgRect.anchorMin = Vector2.zero;
+                    cardImgRect.anchorMax = Vector2.one;
+                    cardImgRect.sizeDelta = new Vector2(-4, -4); // Small inset from border
+                    cardImgRect.anchoredPosition = Vector2.zero;
+
+                    Image cardImg = cardImgObj.AddComponent<Image>();
+                    cardImg.sprite = cardSprite;
+                    cardImg.preserveAspect = true;
+                    cardImg.raycastTarget = false;
+
+                    spriteLoaded = true;
+                }
+            }
+
+            // Fallback: text label if sprite failed to load
+            if (!spriteLoaded)
+            {
+                GameObject textObj = new GameObject("Label");
+                textObj.transform.SetParent(iconObj.transform, false);
+
+                RectTransform textRect = textObj.AddComponent<RectTransform>();
+                textRect.anchorMin = Vector2.zero;
+                textRect.anchorMax = Vector2.one;
+                textRect.sizeDelta = Vector2.zero;
+
+                TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
+                tmp.text = label;
+                tmp.fontSize = 14;
+                tmp.fontStyle = FontStyles.Bold;
+                tmp.color = Color.white;
+                tmp.alignment = TextAlignmentOptions.Center;
+                tmp.outlineWidth = 0.15f;
+                tmp.outlineColor = new Color(0, 0, 0, 0.7f);
+            }
 
             // Add layout element for proper sizing
             LayoutElement layoutElem = iconObj.AddComponent<LayoutElement>();
-            layoutElem.preferredWidth = 36;
-            layoutElem.preferredHeight = 36;
-            layoutElem.minWidth = 36;
-            layoutElem.minHeight = 36;
+            layoutElem.preferredWidth = 30;
+            layoutElem.preferredHeight = 45;
+            layoutElem.minWidth = 30;
+            layoutElem.minHeight = 45;
 
             return bg;
         }
@@ -705,6 +749,68 @@ namespace Lekha.UI
             {
                 tenOfDiamondsIcon.gameObject.SetActive(false);
             }
+        }
+
+        private void CreateTurnBadge()
+        {
+            turnBadge = new GameObject("TurnBadge");
+            turnBadge.transform.SetParent(transform, false);
+
+            RectTransform badgeRect = turnBadge.AddComponent<RectTransform>();
+            // Position below the panel
+            badgeRect.anchorMin = new Vector2(0.5f, 0f);
+            badgeRect.anchorMax = new Vector2(0.5f, 0f);
+            badgeRect.pivot = new Vector2(0.5f, 1f);
+            badgeRect.anchoredPosition = new Vector2(0, -4);
+            badgeRect.sizeDelta = new Vector2(100, 26);
+
+            // Ensure badge renders on top
+            Canvas badgeCanvas = turnBadge.AddComponent<Canvas>();
+            badgeCanvas.overrideSorting = true;
+            badgeCanvas.sortingOrder = 160;
+            turnBadge.AddComponent<GraphicRaycaster>();
+
+            // Bright green pill background
+            Image badgeBg = turnBadge.AddComponent<Image>();
+            badgeBg.color = new Color(0.15f, 0.75f, 0.30f, 0.95f);
+            badgeBg.raycastTarget = false;
+            if (ModernUITheme.Instance != null && ModernUITheme.Instance.PillSprite != null)
+            {
+                badgeBg.sprite = ModernUITheme.Instance.PillSprite;
+                badgeBg.type = Image.Type.Sliced;
+            }
+
+            // Green glow outline
+            Outline badgeOutline = turnBadge.AddComponent<Outline>();
+            badgeOutline.effectColor = new Color(0.2f, 1f, 0.4f, 0.7f);
+            badgeOutline.effectDistance = new Vector2(2, -2);
+
+            // Shadow for depth
+            Shadow badgeShadow = turnBadge.AddComponent<Shadow>();
+            badgeShadow.effectColor = new Color(0, 0, 0, 0.5f);
+            badgeShadow.effectDistance = new Vector2(0, -2);
+
+            // Label text
+            GameObject labelObj = new GameObject("TurnLabel");
+            labelObj.transform.SetParent(turnBadge.transform, false);
+
+            RectTransform labelRect = labelObj.AddComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.sizeDelta = Vector2.zero;
+
+            turnBadgeText = labelObj.AddComponent<TextMeshProUGUI>();
+            turnBadgeText.fontSize = 14;
+            turnBadgeText.fontStyle = FontStyles.Bold;
+            turnBadgeText.alignment = TextAlignmentOptions.Center;
+            turnBadgeText.color = Color.white;
+            turnBadgeText.raycastTarget = false;
+
+            // Determine if this is the local player
+            bool isLocalPlayer = player.IsHuman && visualPosition == PlayerPosition.South;
+            turnBadgeText.text = isLocalPlayer ? "\u25b6 YOUR TURN" : "\u25b6 TURN";
+
+            turnBadge.SetActive(false);
         }
 
         private void CreateDisconnectOverlay()
@@ -937,6 +1043,12 @@ namespace Lekha.UI
             isTurnActive = active;
             turnGlow.enabled = active;
 
+            // Show/hide the turn badge
+            if (turnBadge != null)
+            {
+                turnBadge.SetActive(active);
+            }
+
             if (active)
             {
                 // Scale up when active - static scale, no animation
@@ -1079,6 +1191,179 @@ namespace Lekha.UI
         {
             UpdateScore();
         }
+
+        #region Passed Cards Display
+
+        /// <summary>
+        /// Show passed cards as small card images above this player's panel.
+        /// Displays for 3 seconds then fades out.
+        /// </summary>
+        public void ShowPassedCards(List<Card> cards)
+        {
+            if (cards == null || cards.Count == 0) return;
+
+            // Cancel any existing passed cards display
+            if (passedCardsCoroutine != null)
+            {
+                StopCoroutine(passedCardsCoroutine);
+            }
+
+            passedCardsCoroutine = StartCoroutine(AnimatePassedCards(cards));
+        }
+
+        private System.Collections.IEnumerator AnimatePassedCards(List<Card> cards)
+        {
+            // Create container above the panel
+            GameObject container = new GameObject("PassedCardsDisplay");
+            container.transform.SetParent(transform, false);
+
+            RectTransform containerRect = container.AddComponent<RectTransform>();
+            // Position above the panel
+            containerRect.anchorMin = new Vector2(0.5f, 1f);
+            containerRect.anchorMax = new Vector2(0.5f, 1f);
+            containerRect.pivot = new Vector2(0.5f, 0f);
+            containerRect.anchoredPosition = new Vector2(0, 5);
+            // Total width matches panel (~230px), each card ~70px
+            float totalWidth = Mathf.Min(cards.Count * 70f, panelRect.sizeDelta.x);
+            float cardWidth = totalWidth / cards.Count;
+            float cardHeight = cardWidth * 1.4f; // Card aspect ratio
+            containerRect.sizeDelta = new Vector2(totalWidth, cardHeight);
+
+            // Ensure it renders on top
+            Canvas containerCanvas = container.AddComponent<Canvas>();
+            containerCanvas.overrideSorting = true;
+            containerCanvas.sortingOrder = 170;
+            container.AddComponent<GraphicRaycaster>();
+
+            // Background panel behind cards
+            Image bgImg = container.AddComponent<Image>();
+            bgImg.color = new Color(0.05f, 0.10f, 0.07f, 0.85f);
+            bgImg.raycastTarget = false;
+            if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
+            {
+                bgImg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
+                bgImg.type = Image.Type.Sliced;
+            }
+
+            // Horizontal layout for cards
+            HorizontalLayoutGroup layout = container.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.padding = new RectOffset(4, 4, 4, 4);
+
+            CanvasGroup cg = container.AddComponent<CanvasGroup>();
+            cg.alpha = 0f;
+
+            // Create card images
+            foreach (var card in cards)
+            {
+                string spritePath = GetCardSpritePath(card);
+                GameObject cardObj = new GameObject($"PassedCard_{card.GetUnoName()}");
+                cardObj.transform.SetParent(container.transform, false);
+
+                RectTransform cardRect = cardObj.AddComponent<RectTransform>();
+                float cw = cardWidth - 8f;
+                float ch = cw * 1.4f;
+
+                Image cardImg = cardObj.AddComponent<Image>();
+                cardImg.raycastTarget = false;
+                cardImg.preserveAspect = true;
+
+                // Try to load card sprite
+                if (!string.IsNullOrEmpty(spritePath))
+                {
+                    Texture2D tex = Resources.Load<Texture2D>(spritePath);
+                    if (tex != null)
+                    {
+                        Sprite sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height),
+                            new Vector2(0.5f, 0.5f), tex.width);
+                        cardImg.sprite = sprite;
+                        cardImg.color = Color.white;
+                    }
+                    else
+                    {
+                        cardImg.color = new Color(0.3f, 0.3f, 0.4f, 0.9f);
+                    }
+                }
+                else
+                {
+                    cardImg.color = new Color(0.3f, 0.3f, 0.4f, 0.9f);
+                }
+
+                LayoutElement le = cardObj.AddComponent<LayoutElement>();
+                le.preferredWidth = cw;
+                le.preferredHeight = ch;
+            }
+
+            // Fade in
+            float fadeInTime = 0.3f;
+            float elapsed = 0f;
+            while (elapsed < fadeInTime)
+            {
+                elapsed += Time.deltaTime;
+                cg.alpha = Mathf.Lerp(0f, 1f, elapsed / fadeInTime);
+                yield return null;
+            }
+            cg.alpha = 1f;
+
+            // Hold for 3 seconds
+            yield return new WaitForSeconds(3f);
+
+            // Fade out
+            float fadeOutTime = 0.5f;
+            elapsed = 0f;
+            while (elapsed < fadeOutTime)
+            {
+                elapsed += Time.deltaTime;
+                cg.alpha = Mathf.Lerp(1f, 0f, elapsed / fadeOutTime);
+                yield return null;
+            }
+
+            // Cleanup
+            Destroy(container);
+            passedCardsCoroutine = null;
+        }
+
+        /// <summary>
+        /// Get the Resources sprite path for a Card using the Uno-style naming convention.
+        /// </summary>
+        private string GetCardSpritePath(Card card)
+        {
+            // Map suits to Uno colors
+            string color = card.Suit switch
+            {
+                Suit.Hearts => "Red",
+                Suit.Diamonds => "Yellow",
+                Suit.Clubs => "Green",
+                Suit.Spades => "Blue",
+                _ => "Red"
+            };
+
+            // Map ranks to Uno card names
+            string cardName = card.Rank switch
+            {
+                Rank.Two => $"{color}_2",
+                Rank.Three => $"{color}_3",
+                Rank.Four => $"{color}_4",
+                Rank.Five => $"{color}_5",
+                Rank.Six => $"{color}_6",
+                Rank.Seven => $"{color}_7",
+                Rank.Eight => $"{color}_8",
+                Rank.Nine => $"{color}_9",
+                Rank.Ten => $"{color}_0",          // 10 maps to 0
+                Rank.Jack => $"{color}_Reverse",    // Jack maps to Reverse
+                Rank.Queen => $"{color}_Draw_2",    // Queen maps to Draw 2
+                Rank.King => $"{color}_Skip",       // King maps to Skip
+                Rank.Ace => $"{color}_1",           // Ace maps to 1
+                _ => $"{color}_1"
+            };
+
+            return $"Cards/{color}/{cardName}";
+        }
+
+        #endregion
 
         #region Emoji Display
 
