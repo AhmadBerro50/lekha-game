@@ -54,8 +54,8 @@ namespace Lekha.UI
 
         // Modern teal/ocean color palette
         private static readonly Color BgDark = new Color(0.04f, 0.08f, 0.14f);
-        private static readonly Color CardBg = new Color(0.06f, 0.12f, 0.20f, 0.92f);
-        private static readonly Color CardBgHover = new Color(0.08f, 0.16f, 0.26f, 0.95f);
+        private static readonly Color CardBg = new Color(0.02f, 0.04f, 0.10f, 0.92f);
+        private static readonly Color CardBgHover = new Color(0.04f, 0.07f, 0.14f, 0.95f);
         private static readonly Color AccentCyan = new Color(0.30f, 0.80f, 0.90f, 1f);
         private static readonly Color AccentMagenta = new Color(0.30f, 0.80f, 0.90f, 1f); // Use cyan instead of magenta
         private static readonly Color AccentGreen = new Color(0.30f, 0.90f, 0.60f, 1f);
