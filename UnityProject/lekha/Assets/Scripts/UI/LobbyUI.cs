@@ -406,8 +406,31 @@ namespace Lekha.UI
             avatarImg.sprite = circleSprite;
             avatarImg.color = AccentCyan;
 
-            CreateLabel(avatar.transform, "Initial", playerName.Length > 0 ? playerName[0].ToString().ToUpper() : "?",
-                20, BgDark, Vector2.zero, FontStyles.Bold);
+            // Add mask for circular clipping
+            Mask infoBarAvatarMask = avatar.AddComponent<Mask>();
+            infoBarAvatarMask.showMaskGraphic = true;
+
+            // Try to load profile avatar for local player
+            Sprite profileAvatar = PlayerProfileManager.Instance?.CurrentProfile?.GetAvatarSprite();
+            if (profileAvatar != null)
+            {
+                GameObject profileAvatarObj = new GameObject("AvatarImage");
+                profileAvatarObj.transform.SetParent(avatar.transform, false);
+                RectTransform profileAvatarRect = profileAvatarObj.AddComponent<RectTransform>();
+                profileAvatarRect.anchorMin = Vector2.zero;
+                profileAvatarRect.anchorMax = Vector2.one;
+                profileAvatarRect.offsetMin = Vector2.zero;
+                profileAvatarRect.offsetMax = Vector2.zero;
+                Image profileAvatarImg = profileAvatarObj.AddComponent<Image>();
+                profileAvatarImg.sprite = profileAvatar;
+                profileAvatarImg.preserveAspect = true;
+                profileAvatarImg.raycastTarget = false;
+            }
+            else
+            {
+                CreateLabel(avatar.transform, "Initial", playerName.Length > 0 ? playerName[0].ToString().ToUpper() : "?",
+                    20, BgDark, Vector2.zero, FontStyles.Bold);
+            }
 
             // Player name
             TextMeshProUGUI nameText = CreateLabel(infoBar.transform, "Name", playerName, 24, TextPrimary,
@@ -1093,6 +1116,23 @@ namespace Lekha.UI
             avatarInnerBg.sprite = circleSprite;
             avatarInnerBg.color = new Color(0.06f, 0.07f, 0.09f, 1f);
             avatarInnerBg.raycastTarget = false;
+
+            // Add mask so avatar image is clipped to circle
+            Mask avatarMask = avatarInner.AddComponent<Mask>();
+            avatarMask.showMaskGraphic = true;
+
+            // Avatar image (for custom avatar sprites)
+            GameObject avatarImageObj = new GameObject("AvatarImage");
+            avatarImageObj.transform.SetParent(avatarInner.transform, false);
+            RectTransform avatarImgRect = avatarImageObj.AddComponent<RectTransform>();
+            avatarImgRect.anchorMin = Vector2.zero;
+            avatarImgRect.anchorMax = Vector2.one;
+            avatarImgRect.offsetMin = Vector2.zero;
+            avatarImgRect.offsetMax = Vector2.zero;
+            Image avatarImg = avatarImageObj.AddComponent<Image>();
+            avatarImg.preserveAspect = true;
+            avatarImg.raycastTarget = false;
+            avatarImageObj.SetActive(false);
 
             // Avatar initial text (+ icon when empty)
             GameObject initial = new GameObject("Initial");
@@ -2014,21 +2054,44 @@ namespace Lekha.UI
             avatarBg.sprite = circleSprite;
             avatarBg.color = isLocal ? AccentCyan : TextSecondary;
 
-            // Initial letter
-            GameObject initialObj = new GameObject("Initial");
-            initialObj.transform.SetParent(avatar.transform, false);
-            RectTransform initRect = initialObj.AddComponent<RectTransform>();
-            initRect.anchorMin = Vector2.zero;
-            initRect.anchorMax = Vector2.one;
-            initRect.offsetMin = Vector2.zero;
-            initRect.offsetMax = Vector2.zero;
-            TextMeshProUGUI initText = initialObj.AddComponent<TextMeshProUGUI>();
-            string initial = !string.IsNullOrEmpty(player.DisplayName) ? player.DisplayName[0].ToString().ToUpper() : "?";
-            initText.text = initial;
-            initText.fontSize = 14;
-            initText.color = BgDark;
-            initText.alignment = TextAlignmentOptions.Center;
-            initText.fontStyle = FontStyles.Bold;
+            // Add mask for circular clipping of avatar image
+            Mask chipAvatarMask = avatar.AddComponent<Mask>();
+            chipAvatarMask.showMaskGraphic = true;
+
+            // Try to load custom avatar image
+            Sprite avatarSprite = LoadNetworkPlayerAvatar(player);
+            if (avatarSprite != null)
+            {
+                GameObject avatarImgObj = new GameObject("AvatarImage");
+                avatarImgObj.transform.SetParent(avatar.transform, false);
+                RectTransform avatarImgRect = avatarImgObj.AddComponent<RectTransform>();
+                avatarImgRect.anchorMin = Vector2.zero;
+                avatarImgRect.anchorMax = Vector2.one;
+                avatarImgRect.offsetMin = Vector2.zero;
+                avatarImgRect.offsetMax = Vector2.zero;
+                Image avatarImg = avatarImgObj.AddComponent<Image>();
+                avatarImg.sprite = avatarSprite;
+                avatarImg.preserveAspect = true;
+                avatarImg.raycastTarget = false;
+            }
+            else
+            {
+                // Initial letter fallback
+                GameObject initialObj = new GameObject("Initial");
+                initialObj.transform.SetParent(avatar.transform, false);
+                RectTransform initRect = initialObj.AddComponent<RectTransform>();
+                initRect.anchorMin = Vector2.zero;
+                initRect.anchorMax = Vector2.one;
+                initRect.offsetMin = Vector2.zero;
+                initRect.offsetMax = Vector2.zero;
+                TextMeshProUGUI initText = initialObj.AddComponent<TextMeshProUGUI>();
+                string initial = !string.IsNullOrEmpty(player.DisplayName) ? player.DisplayName[0].ToString().ToUpper() : "?";
+                initText.text = initial;
+                initText.fontSize = 14;
+                initText.color = BgDark;
+                initText.alignment = TextAlignmentOptions.Center;
+                initText.fontStyle = FontStyles.Bold;
+            }
 
             // Name text
             GameObject nameObj = new GameObject("Name");
@@ -2106,13 +2169,44 @@ namespace Lekha.UI
                 }
             }
 
+            // Update avatar image from AvatarData
+            Transform avatarImageTransform = avatarInner?.Find("AvatarImage");
+            bool hasAvatarImage = false;
+            if (avatarImageTransform != null)
+            {
+                Image avatarImg = avatarImageTransform.GetComponent<Image>();
+                if (hasPlayer && avatarImg != null)
+                {
+                    Sprite avatarSprite = LoadNetworkPlayerAvatar(player);
+                    if (avatarSprite != null)
+                    {
+                        avatarImg.sprite = avatarSprite;
+                        avatarImageTransform.gameObject.SetActive(true);
+                        hasAvatarImage = true;
+                    }
+                    else
+                    {
+                        avatarImageTransform.gameObject.SetActive(false);
+                    }
+                }
+                else
+                {
+                    if (avatarImageTransform != null) avatarImageTransform.gameObject.SetActive(false);
+                }
+            }
+
             // Update initial
             if (initialTransform != null)
             {
                 TextMeshProUGUI initialText = initialTransform.GetComponent<TextMeshProUGUI>();
                 if (initialText != null)
                 {
-                    if (hasPlayer && !string.IsNullOrEmpty(player.DisplayName))
+                    if (hasAvatarImage)
+                    {
+                        // Hide initial when avatar image is shown
+                        initialText.text = "";
+                    }
+                    else if (hasPlayer && !string.IsNullOrEmpty(player.DisplayName))
                     {
                         initialText.text = player.DisplayName[0].ToString().ToUpper();
                         initialText.color = BgDark;
@@ -2209,6 +2303,46 @@ namespace Lekha.UI
                     slotBg.color = new Color(0.08f, 0.09f, 0.12f, 0.95f);
                 }
             }
+        }
+
+        /// <summary>
+        /// Load avatar sprite for a NetworkPlayer.
+        /// For local player: loads from profile. For remote: decodes AvatarData base64 PNG.
+        /// </summary>
+        private Sprite LoadNetworkPlayerAvatar(NetworkPlayer player)
+        {
+            if (player == null) return null;
+
+            bool isLocal = player.PlayerId == NetworkManager.Instance?.LocalPlayerId;
+
+            // Local player: load from profile
+            if (isLocal)
+            {
+                var profile = PlayerProfileManager.Instance?.CurrentProfile;
+                if (profile != null)
+                {
+                    Sprite avatarSprite = profile.GetAvatarSprite();
+                    if (avatarSprite != null) return avatarSprite;
+                }
+            }
+
+            // Remote player (or local with no profile avatar): decode AvatarData
+            if (!string.IsNullOrEmpty(player.AvatarData))
+            {
+                try
+                {
+                    byte[] bytes = System.Convert.FromBase64String(player.AvatarData);
+                    Texture2D tex = new Texture2D(2, 2);
+                    tex.LoadImage(bytes);
+                    return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"[LobbyUI] Failed to decode avatar for {player.DisplayName}: {e.Message}");
+                }
+            }
+
+            return null;
         }
 
         private void UpdateOnlinePlayersBar(GameRoom room)
