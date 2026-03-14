@@ -71,6 +71,7 @@ namespace Lekha.Network
 
         // Social
         EmojiReaction,
+        ChatMessage,
 
         // Meta
         OnlineCount,
@@ -262,6 +263,7 @@ namespace Lekha.Network
         public event Action<NetworkPlayer> OnPlayerReconnected;  // Player reconnected
         public event Action<BotReplacedData> OnBotReplaced;  // Player replaced by bot after timeout
         public event Action<string, string> OnEmojiReceived;  // emoji, fromPosition
+        public event Action<string, string, string> OnChatMessageReceived;  // playerName, text, position
         public event Action<int> OnOnlineCountChanged;  // total players online
         public event Action<string, string, string> OnPositionSelected;  // playerId, newPosition, oldPosition
         public event Action<string> OnGameStarted;
@@ -754,6 +756,10 @@ namespace Lekha.Network
                     HandleEmojiReaction(message);
                     break;
 
+                case NetworkMessageType.ChatMessage:
+                    HandleChatMessage(message);
+                    break;
+
                 case NetworkMessageType.OnlineCount:
                     HandleOnlineCount(message);
                     break;
@@ -997,6 +1003,35 @@ namespace Lekha.Network
             var data = new EmojiReactionData { Emoji = emoji, Position = position };
             SendGameAction(NetworkMessageType.EmojiReaction, JsonUtility.ToJson(data));
         }
+
+        private void HandleChatMessage(NetworkMessage message)
+        {
+            try
+            {
+                var data = JsonUtility.FromJson<ChatMessageReceived>(message.Data);
+                Debug.Log($"[NetworkManager] Chat message from {data.PlayerName}: {data.Text}");
+                OnChatMessageReceived?.Invoke(data.PlayerName, data.Text, data.Position);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkManager] Failed to parse chat message: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Send a chat message to all players in the room
+        /// </summary>
+        public void SendChatMessage(string text)
+        {
+            var data = new ChatMessageData { Text = text };
+            SendMessage(new NetworkMessage(NetworkMessageType.ChatMessage, JsonUtility.ToJson(data)));
+        }
+
+        [Serializable]
+        private class ChatMessageData { public string Text; }
+
+        [Serializable]
+        private class ChatMessageReceived { public string PlayerName; public string Text; public string Position; public long Timestamp; }
 
         private void HandleOnlineCount(NetworkMessage message)
         {

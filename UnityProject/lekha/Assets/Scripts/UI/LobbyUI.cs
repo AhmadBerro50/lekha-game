@@ -1870,6 +1870,14 @@ namespace Lekha.UI
             UpdateRoomButtons(room);
             SetState(LobbyState.InRoom);
 
+            // Create and show room chat
+            if (RoomChatUI.Instance == null)
+            {
+                GameObject chatObj = new GameObject("RoomChatUI");
+                chatObj.AddComponent<RoomChatUI>();
+            }
+            RoomChatUI.Instance?.Show();
+
             // Join voice channel so players can talk in the lobby
             JoinLobbyVoiceChat(room);
         }
@@ -2496,6 +2504,9 @@ namespace Lekha.UI
             // Leave voice channel first to prevent lingering audio
             if (Lekha.Network.VoiceChatManager.Instance != null)
                 Lekha.Network.VoiceChatManager.Instance.LeaveChannel();
+
+            // Clear and hide chat
+            RoomChatUI.Instance?.ClearAndHide();
 
             NetworkManager.Instance?.LeaveRoom();
             SetState(LobbyState.MainLobby);
