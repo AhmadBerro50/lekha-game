@@ -7,8 +7,8 @@ using UnityEditor;
 /// </summary>
 public class AppIconGenerator : EditorWindow
 {
-    [MenuItem("Tools/Set App Icon")]
-    public static void SetAppIcon()
+    [MenuItem("Tools/Generate App Icon")]
+    public static void Generate()
     {
         // Load the icon texture
         Texture2D icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/AppIcon_1024.png");
