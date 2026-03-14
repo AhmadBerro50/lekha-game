@@ -2122,7 +2122,7 @@ namespace Lekha.UI
             refreshTimer = 0f;
 
             // Show loading state
-            if (refreshButtonText != null) refreshButtonText.text = "Loading...";
+            if (refreshButtonText != null) refreshButtonText.text = "...";
             if (loadingIndicator != null) loadingIndicator.SetActive(true);
 
             Debug.Log("[LobbyUI] Requesting room list...");
