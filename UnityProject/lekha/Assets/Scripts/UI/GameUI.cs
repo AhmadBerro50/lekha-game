@@ -3012,14 +3012,16 @@ namespace Lekha.UI
             UpdateScoreText();
             instructionText.text = "Round ended! Starting next round...";
 
-            // Record round scores to history
+            // Record round scores to history using visual positions
+            // so scores align with what the player sees on screen
             if (scoreSummaryPopup != null && GameManager.Instance != null)
             {
                 int roundNum = GameManager.Instance.RoundNumber;
                 int southScore = 0, eastScore = 0, northScore = 0, westScore = 0;
                 foreach (var p in players)
                 {
-                    switch (p.Position)
+                    PlayerPosition visualPos = GameManager.Instance.GetVisualPosition(p.Position);
+                    switch (visualPos)
                     {
                         case PlayerPosition.South: southScore = p.RoundPoints; break;
                         case PlayerPosition.East: eastScore = p.RoundPoints; break;

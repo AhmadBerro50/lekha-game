@@ -803,9 +803,15 @@ namespace Lekha.UI
 
             Player[] players = GameManager.Instance.Players;
 
+            // Default labels and colors by visual position
+            string[] defaultLabels = { "YOU", "EAST", "PARTNER", "WEST" };
+            Color[] defaultColors = { YourColor, OpponentColor, PartnerColor, OpponentColor };
+
             foreach (var player in players)
             {
-                int index = player.Position switch
+                // Use visual position so local player always maps to "YOU" (South/index 0)
+                PlayerPosition visualPos = GameManager.Instance.GetVisualPosition(player.Position);
+                int index = visualPos switch
                 {
                     PlayerPosition.South => 0,
                     PlayerPosition.East => 1,
@@ -813,6 +819,14 @@ namespace Lekha.UI
                     PlayerPosition.West => 3,
                     _ => 0
                 };
+
+                // Update player name - show actual name if available, fallback to label
+                if (playerNameTexts[index] != null)
+                {
+                    string displayName = !string.IsNullOrEmpty(player.PlayerName) ? player.PlayerName : defaultLabels[index];
+                    playerNameTexts[index].text = displayName;
+                    playerNameTexts[index].color = defaultColors[index];
+                }
 
                 if (playerTotalTexts[index] != null)
                 {
