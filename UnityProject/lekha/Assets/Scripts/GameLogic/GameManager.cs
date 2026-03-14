@@ -78,6 +78,7 @@ namespace Lekha.GameLogic
         public System.Action<Team> OnGameOver;
         public System.Action OnCardsDealt;
         public System.Action OnPassPhaseComplete;
+        public System.Action<PlayerPosition, List<Card>> OnPassCardsReceived; // fromPosition, cards
         public System.Action<Player> OnTrickStarted; // Fired when a new trick starts, with the leading player
 
         private void Awake()
@@ -273,6 +274,12 @@ namespace Lekha.GameLogic
 
                 receivedPassFrom.Add(passData.FromPosition);
                 Debug.Log($"[GameManager] Local player received {cards.Count} cards from {passData.FromPosition}");
+
+                // Notify UI to show received cards with "P" badge
+                if (System.Enum.TryParse<PlayerPosition>(passData.FromPosition, out PlayerPosition fromPos))
+                {
+                    OnPassCardsReceived?.Invoke(fromPos, cards);
+                }
 
                 if (currentState == GameState.PassingCards)
                 {

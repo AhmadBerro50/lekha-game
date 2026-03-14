@@ -207,6 +207,7 @@ namespace Lekha.UI
                 GameManager.Instance.OnGameOver -= OnGameOver;
                 GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
                 GameManager.Instance.OnPassPhaseComplete -= OnPassPhaseComplete;
+                GameManager.Instance.OnPassCardsReceived -= OnPassCardsReceived;
                 GameManager.Instance.OnTrickStarted -= OnTrickStarted;
             }
 
@@ -1582,6 +1583,7 @@ namespace Lekha.UI
                 GameManager.Instance.OnGameOver += OnGameOver;
                 GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
                 GameManager.Instance.OnPassPhaseComplete += OnPassPhaseComplete;
+                GameManager.Instance.OnPassCardsReceived += OnPassCardsReceived;
                 GameManager.Instance.OnTrickStarted += OnTrickStarted;
                 Debug.Log("[GameUI] All events subscribed successfully");
 
@@ -1703,6 +1705,26 @@ namespace Lekha.UI
             {
                 panel.ShowPassedCards(cards);
                 Debug.Log($"[ShowPassedCardsOnRecipient] Showing {cards.Count} passed cards above {recipientPos} panel");
+            }
+            else
+            {
+                Debug.LogWarning($"[ShowPassedCardsOnRecipient] No panel found for {recipientPos}");
+            }
+        }
+
+        /// <summary>
+        /// Called when we receive passed cards from another player — show them above our own panel
+        /// </summary>
+        private void OnPassCardsReceived(PlayerPosition fromPos, List<Card> cards)
+        {
+            // Show the received cards above the LOCAL player's panel with the P badge
+            Player localPlayer = GameManager.Instance?.GetHumanPlayer();
+            if (localPlayer == null) return;
+
+            if (playerInfoPanels.TryGetValue(localPlayer.Position, out PlayerInfoPanel myPanel))
+            {
+                myPanel.ShowPassedCards(cards);
+                Debug.Log($"[OnPassCardsReceived] Showing {cards.Count} cards received from {fromPos} above local player panel");
             }
         }
 
