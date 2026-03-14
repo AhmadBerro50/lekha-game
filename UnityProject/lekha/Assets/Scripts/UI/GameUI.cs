@@ -76,6 +76,14 @@ namespace Lekha.UI
         private const float CARD_PLAY_COOLDOWN = 0.4f; // Minimum time between any card plays
         private const float TRICK_COMPLETE_COOLDOWN = 1.0f; // Time to wait after trick completes before next play
 
+        /// <summary>
+        /// True when the local client is spectating (not a player in the game).
+        /// </summary>
+        private bool IsSpectating => NetworkManager.Instance != null && NetworkManager.Instance.IsSpectating;
+
+        // Spectator info button reference
+        private Button infoButton;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -108,7 +116,7 @@ namespace Lekha.UI
             {
                 yield return new WaitForSeconds(checkInterval);
 
-                if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.PlayingTricks)
+                if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.PlayingTricks || IsSpectating)
                 {
                     lastActionTime = Time.time;
                     continue;
@@ -467,6 +475,9 @@ namespace Lekha.UI
             // Create emoji panel directly in GameUI (no separate component - avoids destruction issues)
             CreateEmojiPanel(canvasTransform);
 
+            // Create info button (top-left, available for all players)
+            infoButton = CreateInfoButton(canvasTransform);
+
             // Create disconnect notification banner (centered, for online games)
             DisconnectNotification.Create(canvasTransform);
 
@@ -751,6 +762,81 @@ namespace Lekha.UI
             iconTmp.raycastTarget = false;
 
             Debug.Log($"[GameUI] Emoji button created at {rect.anchoredPosition}");
+
+            return btn;
+        }
+
+        /// <summary>
+        /// Create a small circular info button (top-left area) that toggles the score summary popup.
+        /// Available for all players, but especially useful for spectators.
+        /// </summary>
+        private Button CreateInfoButton(Transform parent)
+        {
+            GameObject btnObj = new GameObject("InfoButton");
+            btnObj.transform.SetParent(parent, false);
+
+            RectTransform rect = btnObj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 1); // TOP LEFT
+            rect.anchorMax = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(70, -50); // Top-left, away from edges
+            rect.sizeDelta = new Vector2(50, 50);
+
+            Image img = btnObj.AddComponent<Image>();
+
+            Button btn = btnObj.AddComponent<Button>();
+            btn.targetGraphic = img;
+
+            // Green accent for info button
+            Color accentGreen = new Color(0.3f, 0.85f, 0.55f, 1f);
+            if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
+            {
+                img.sprite = ModernUITheme.Instance.CircleSprite;
+                img.color = new Color(0.16f, 0.14f, 0.28f, 0.95f);
+
+                ColorBlock colors = btn.colors;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+                colors.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+                colors.selectedColor = Color.white;
+                btn.colors = colors;
+
+                Shadow shadow = btnObj.AddComponent<Shadow>();
+                shadow.effectColor = new Color(0.3f, 0.85f, 0.55f, 0.3f);
+                shadow.effectDistance = new Vector2(0, -2);
+
+                Outline outline = btnObj.AddComponent<Outline>();
+                outline.effectColor = new Color(0.3f, 0.85f, 0.55f, 0.5f);
+                outline.effectDistance = new Vector2(1, -1);
+            }
+            else
+            {
+                img.color = accentGreen;
+            }
+
+            btn.onClick.AddListener(() => {
+                SoundManager.Instance?.PlayButtonClick();
+                if (scoreSummaryPopup != null)
+                {
+                    scoreSummaryPopup.Toggle();
+                }
+            });
+
+            // "i" icon text
+            GameObject iconObj = new GameObject("Icon");
+            iconObj.transform.SetParent(btnObj.transform, false);
+
+            RectTransform iconRect = iconObj.AddComponent<RectTransform>();
+            iconRect.anchorMin = Vector2.zero;
+            iconRect.anchorMax = Vector2.one;
+            iconRect.sizeDelta = Vector2.zero;
+
+            TextMeshProUGUI iconTmp = iconObj.AddComponent<TextMeshProUGUI>();
+            iconTmp.text = "\u2139"; // ℹ character
+            iconTmp.fontSize = 28;
+            iconTmp.alignment = TextAlignmentOptions.Center;
+            iconTmp.color = accentGreen;
+            iconTmp.fontStyle = FontStyles.Bold;
+            iconTmp.raycastTarget = false;
 
             return btn;
         }
@@ -1654,6 +1740,9 @@ namespace Lekha.UI
 
         private void OnPassClicked()
         {
+            // Spectators cannot pass cards
+            if (IsSpectating) return;
+
             if (selectedForPass.Count == 3)
             {
                 Player localPlayer = GameManager.Instance.GetHumanPlayer();
@@ -1906,6 +1995,18 @@ namespace Lekha.UI
                 panel?.ClearSpecialCards();
             }
 
+            // Spectators don't see any hand cards
+            if (IsSpectating)
+            {
+                Debug.Log("[OnCardsDealt] Spectator mode - skipping hand display");
+                isAnimating = false;
+                DisplayOtherPlayersCardCount();
+                UpdateRoundText();
+                if (instructionText != null)
+                    instructionText.text = "Spectating...";
+                return;
+            }
+
             // Set animating during initial deal
             isAnimating = true;
             DisplayPlayerHandAnimatedWithCallback(() => {
@@ -1923,6 +2024,15 @@ namespace Lekha.UI
 
         private void DisplayPlayerHandAnimatedWithCallback(System.Action onComplete)
         {
+            // Spectators never see hand cards
+            if (IsSpectating)
+            {
+                Debug.Log("[DisplayPlayerHandAnimated] Spectator mode - skipping hand display");
+                ClearPlayerHand();
+                onComplete?.Invoke();
+                return;
+            }
+
             Debug.Log("[DisplayPlayerHandAnimated] Starting to display hand");
 
             // Clear existing cards
@@ -2193,6 +2303,9 @@ namespace Lekha.UI
 
         private void OnPlayerCardClicked(CardUI cardUI)
         {
+            // Spectators cannot interact with cards
+            if (IsSpectating) return;
+
             Debug.Log($"[OnPlayerCardClicked] Card clicked: {cardUI.Card.GetUnoName()}, isPassPhase: {isPassPhase}, CanPlay: {CanPlayNow()}, Cooldown: {GetRemainingCooldown():F2}s, GameState: {GameManager.Instance.CurrentState}");
 
             // Block input during deal animations
@@ -2401,6 +2514,9 @@ namespace Lekha.UI
                 Debug.Log("[OnCardPlayAnimationComplete] Trick complete (4 cards), OnTrickWon will handle next action");
                 return;
             }
+
+            // Spectators just watch - no scheduling of plays or highlights
+            if (IsSpectating) return;
 
             // Schedule next action after cooldown expires
             float delay = GetRemainingCooldown() + 0.05f; // Add tiny buffer
@@ -2860,15 +2976,25 @@ namespace Lekha.UI
 
             if (state == GameState.PassingCards)
             {
-                isPassPhase = true;
-                passButton.gameObject.SetActive(true);
-                instructionText.text = "Select 3 cards to pass right";
-                // Highlight which cards can be passed (respecting the "cannot empty color" rule)
-                UpdatePassableCards();
+                if (IsSpectating)
+                {
+                    // Spectators can't participate in pass phase
+                    isPassPhase = false;
+                    passButton.gameObject.SetActive(false);
+                    instructionText.text = "Spectating - players passing cards...";
+                }
+                else
+                {
+                    isPassPhase = true;
+                    passButton.gameObject.SetActive(true);
+                    instructionText.text = "Select 3 cards to pass right";
+                    // Highlight which cards can be passed (respecting the "cannot empty color" rule)
+                    UpdatePassableCards();
 
-                // HOST: auto-pass for disconnected/bot players
-                if (NetworkGameSync.Instance != null)
-                    NetworkGameSync.Instance.AutoPassForDisconnectedPlayers();
+                    // HOST: auto-pass for disconnected/bot players
+                    if (NetworkGameSync.Instance != null)
+                        NetworkGameSync.Instance.AutoPassForDisconnectedPlayers();
+                }
             }
             else if (state == GameState.PlayingTricks)
             {
@@ -2883,6 +3009,19 @@ namespace Lekha.UI
         {
             Debug.Log("[OnPassPhaseComplete] Pass phase completed, refreshing hand display");
             ResetWatchdogTimer();
+
+            // Spectators don't have hand cards to refresh
+            if (IsSpectating)
+            {
+                Debug.Log("[OnPassPhaseComplete] Spectator mode - skipping hand display");
+                isAnimating = false;
+                isPassPhase = false;
+                selectedForPass.Clear();
+                if (instructionText != null)
+                    instructionText.text = "Spectating...";
+                return;
+            }
+
             // Set animating flag BEFORE displaying cards so OnTrickStarted knows to wait
             isAnimating = true;
             DisplayPlayerHandAnimatedWithCallback(() => {
@@ -2941,6 +3080,15 @@ namespace Lekha.UI
             // Use the CURRENT player (not the one passed in - it may have changed due to network)
             Player currentPlayer = GameManager.Instance.CurrentPlayer;
             Debug.Log($"[StartTurnAfterDelay] Ready to proceed. Original leader: {player.PlayerName}, Current player: {currentPlayer.PlayerName}");
+
+            // Spectators just watch - no highlighting or AI triggering
+            if (IsSpectating)
+            {
+                Debug.Log("[StartTurnAfterDelay] Spectator mode - just watching");
+                if (instructionText != null)
+                    instructionText.text = $"Spectating - {currentPlayer.PlayerName}'s turn";
+                yield break;
+            }
 
             bool isLocalTurn = GameManager.Instance.IsLocalPlayerTurn();
             if (isLocalTurn)
@@ -3142,6 +3290,9 @@ namespace Lekha.UI
 
         private void HighlightPlayableCards()
         {
+            // Spectators have no hand cards to highlight
+            if (IsSpectating) return;
+
             Suit? ledSuit = GameManager.Instance.LedSuit;
             Player localPlayer = GameManager.Instance.GetHumanPlayer();
             List<Card> playable = localPlayer.GetPlayableCards(ledSuit);
@@ -3187,7 +3338,11 @@ namespace Lekha.UI
             if (GameManager.Instance.CurrentState == GameState.PlayingTricks)
             {
                 Player current = GameManager.Instance.CurrentPlayer;
-                if (GameManager.Instance.IsLocalPlayerTurn())
+                if (IsSpectating)
+                {
+                    instructionText.text = $"Spectating - {current.PlayerName}'s turn";
+                }
+                else if (GameManager.Instance.IsLocalPlayerTurn())
                 {
                     instructionText.text = "Your turn - tap a card to play";
                 }
@@ -3199,6 +3354,10 @@ namespace Lekha.UI
                 {
                     instructionText.text = $"{current.PlayerName}'s turn...";
                 }
+            }
+            else if (IsSpectating)
+            {
+                instructionText.text = "Spectating...";
             }
         }
 
