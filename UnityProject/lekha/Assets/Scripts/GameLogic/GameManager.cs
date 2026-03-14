@@ -330,15 +330,31 @@ namespace Lekha.GameLogic
 
             if (currentState == GameState.PassingCards)
             {
-                Debug.LogError($"[GameManager] Pass phase timeout after {PASS_PHASE_TIMEOUT}s — forcing completion");
-                localPassSubmitted = true; // Prevent buffered cards from re-triggering
-                bufferedPassCards = null;
-                // Skip directly to trick phase — don't fire OnPassPhaseComplete twice
-                CancelPassPhaseTimeout();
-                receivedPassFrom.Clear();
-                Debug.LogWarning("[GameManager] Forcing transition to trick phase");
-                OnPassPhaseComplete?.Invoke();
-                StartTrickPhase();
+                // DO NOT force-start the game — just log a warning
+                // The server handles pass card buffering and will release when all 4 submit
+                // If local player hasn't passed yet, auto-submit their first 3 cards
+                if (!localPassSubmitted)
+                {
+                    Debug.LogWarning($"[GameManager] Pass phase timeout — local player hasn't passed yet, auto-passing");
+                    Player local = GetHumanPlayer();
+                    if (local != null && local.Hand.Count >= 3)
+                    {
+                        // Fire the UI to auto-select and submit
+                        // For now just mark as submitted so buffered cards can apply
+                        localPassSubmitted = true;
+                        if (bufferedPassCards != null)
+                        {
+                            Debug.Log("[GameManager] Applying buffered pass cards after auto-submit");
+                            ApplyReceivedPassCards(bufferedPassCards);
+                            bufferedPassCards = null;
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[GameManager] Pass phase timeout — still waiting for pass cards from server");
+                    // Don't force anything — keep waiting for server to release pass cards
+                }
             }
             passPhaseTimeoutCoroutine = null;
         }
