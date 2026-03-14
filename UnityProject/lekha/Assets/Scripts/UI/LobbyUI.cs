@@ -52,20 +52,20 @@ namespace Lekha.UI
         private Button startButton;
         private TextMeshProUGUI readyButtonText;
 
-        // Modern 2026 Glassmorphism Color Palette
-        private static readonly Color BgDark = new Color(0.06f, 0.08f, 0.14f);
-        private static readonly Color CardBg = new Color(0.12f, 0.14f, 0.22f, 0.92f);
-        private static readonly Color CardBgHover = new Color(0.16f, 0.18f, 0.28f, 0.95f);
-        private static readonly Color AccentCyan = new Color(0.40f, 0.75f, 1f, 1f);
-        private static readonly Color AccentMagenta = new Color(0.85f, 0.45f, 0.95f, 1f);
-        private static readonly Color AccentGreen = new Color(0.45f, 0.95f, 0.70f, 1f);
+        // Modern teal/ocean color palette
+        private static readonly Color BgDark = new Color(0.04f, 0.08f, 0.14f);
+        private static readonly Color CardBg = new Color(0.06f, 0.12f, 0.20f, 0.92f);
+        private static readonly Color CardBgHover = new Color(0.08f, 0.16f, 0.26f, 0.95f);
+        private static readonly Color AccentCyan = new Color(0.30f, 0.80f, 0.90f, 1f);
+        private static readonly Color AccentMagenta = new Color(0.30f, 0.80f, 0.90f, 1f); // Use cyan instead of magenta
+        private static readonly Color AccentGreen = new Color(0.30f, 0.90f, 0.60f, 1f);
         private static readonly Color AccentRed = new Color(0.95f, 0.35f, 0.45f, 1f);
         private static readonly Color TextPrimary = new Color(1f, 1f, 1f, 1f);
-        private static readonly Color TextSecondary = new Color(0.72f, 0.75f, 0.82f, 1f);
-        private static readonly Color TextMuted = new Color(0.50f, 0.52f, 0.60f, 1f);
-        private static readonly Color InputBg = new Color(0.08f, 0.10f, 0.16f, 0.95f);
-        private static readonly Color BorderColor = new Color(1f, 1f, 1f, 0.15f);
-        private static readonly Color GlassBorder = new Color(1f, 1f, 1f, 0.18f);
+        private static readonly Color TextSecondary = new Color(0.70f, 0.80f, 0.85f, 1f);
+        private static readonly Color TextMuted = new Color(0.45f, 0.55f, 0.62f, 1f);
+        private static readonly Color InputBg = new Color(0.04f, 0.08f, 0.14f, 0.95f);
+        private static readonly Color BorderColor = new Color(1f, 1f, 1f, 0.12f);
+        private static readonly Color GlassBorder = new Color(1f, 1f, 1f, 0.12f);
 
         // Generated textures
         private Sprite roundedSprite;
@@ -509,7 +509,7 @@ namespace Lekha.UI
             titleText.alignment = TextAlignmentOptions.Left;
 
             // Refresh button - anchored to right
-            Button refreshBtn = CreateModernButton(roomsHeader.transform, "RefreshBtn", "Refresh", AccentMagenta, new Vector2(-15, 0), new Vector2(100, 36), OnRefreshClicked);
+            Button refreshBtn = CreateModernButton(roomsHeader.transform, "RefreshBtn", "Refresh", AccentCyan, new Vector2(-15, 0), new Vector2(120, 36), OnRefreshClicked);
             RectTransform refreshRect = refreshBtn.GetComponent<RectTransform>();
             refreshRect.anchorMin = new Vector2(1, 0.5f);
             refreshRect.anchorMax = new Vector2(1, 0.5f);
