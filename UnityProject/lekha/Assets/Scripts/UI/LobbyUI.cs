@@ -1837,11 +1837,47 @@ namespace Lekha.UI
         private void JoinLobbyVoiceChat(GameRoom room)
         {
             if (room == null || string.IsNullOrEmpty(room.RoomId)) return;
-            if (Lekha.Network.VoiceChatManager.Instance == null) return;
+
+            // Create VoiceChatManager if it doesn't exist yet (lobby can open before GameController)
+            if (Lekha.Network.VoiceChatManager.Instance == null)
+            {
+                GameObject voiceObj = new GameObject("VoiceChatManager");
+                UnityEngine.Object.DontDestroyOnLoad(voiceObj);
+                voiceObj.AddComponent<Lekha.Network.VoiceChatManager>();
+                Debug.Log("[LobbyUI] Created VoiceChatManager for lobby voice");
+            }
 
             string position = Lekha.Network.NetworkManager.Instance?.LocalPlayer?.AssignedPosition ?? "South";
             Debug.Log($"[LobbyUI] Joining voice channel for room lobby: {room.RoomId}, position: {position}");
             Lekha.Network.VoiceChatManager.Instance.JoinChannel(room.RoomId, position);
+
+            // Sync lobby button states with actual voice state
+            UpdateLobbyVoiceButtonStates();
+        }
+
+        private void UpdateLobbyVoiceButtonStates()
+        {
+            if (Lekha.Network.VoiceChatManager.Instance == null) return;
+
+            lobbyMicMuted = Lekha.Network.VoiceChatManager.Instance.IsMicrophoneMuted;
+            lobbySpeakerMuted = Lekha.Network.VoiceChatManager.Instance.IsSpeakerMuted;
+
+            if (lobbyMicText != null)
+                lobbyMicText.text = lobbyMicMuted ? "MIC OFF" : "MIC";
+            if (lobbySpeakerText != null)
+                lobbySpeakerText.text = lobbySpeakerMuted ? "SPK OFF" : "SPK";
+            if (lobbyMicButton != null)
+            {
+                Image img = lobbyMicButton.GetComponent<Image>();
+                if (img != null)
+                    img.color = lobbyMicMuted ? new Color(0.70f, 0.25f, 0.25f, 1f) : new Color(0.20f, 0.70f, 0.45f, 1f);
+            }
+            if (lobbySpeakerButton != null)
+            {
+                Image img = lobbySpeakerButton.GetComponent<Image>();
+                if (img != null)
+                    img.color = lobbySpeakerMuted ? new Color(0.70f, 0.25f, 0.25f, 1f) : new Color(0.30f, 0.55f, 0.90f, 1f);
+            }
         }
 
         private void OnRoomUpdated(GameRoom room)
@@ -2323,6 +2359,10 @@ namespace Lekha.UI
 
         private void OnLeaveRoomClicked()
         {
+            // Leave voice channel first to prevent lingering audio
+            if (Lekha.Network.VoiceChatManager.Instance != null)
+                Lekha.Network.VoiceChatManager.Instance.LeaveChannel();
+
             NetworkManager.Instance?.LeaveRoom();
             SetState(LobbyState.MainLobby);
             OnRefreshClicked();
