@@ -539,6 +539,12 @@ namespace Lekha.GameLogic
                 PlayerPosition rightPosition = Player.GetPlayerToRight(kvp.Key.Position);
                 Player rightPlayer = GetPlayerAtPosition(rightPosition);
                 rightPlayer.AddPassedCards(kvp.Value);
+
+                // Notify UI which cards were passed to the local player
+                if (rightPlayer.IsHuman && (!isOnlineGame || (localPlayerPosition.HasValue && rightPosition == localPlayerPosition.Value)))
+                {
+                    OnPassCardsReceived?.Invoke(kvp.Key.Position, kvp.Value);
+                }
             }
 
             Debug.Log("Pass phase complete");
