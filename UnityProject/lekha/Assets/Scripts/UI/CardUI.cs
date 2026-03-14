@@ -30,6 +30,8 @@ namespace Lekha.UI
         private bool isPlayable = true;
         private bool isFaceUp = true;
         private bool isHovering = false;
+        private bool isPassedCard = false;
+        private GameObject passBadge;
         private Vector2 originalPosition;
         private float originalScale = 1f;
         private float hoverOffset = 30f;
@@ -115,15 +117,61 @@ namespace Lekha.UI
         {
             this.card = card;
             this.isFaceUp = faceUp;
-            this.isPlayable = true; // Cards start as playable by default
+            this.isPlayable = true;
+            this.isPassedCard = false;
             UpdateSprite();
+            HidePassBadge();
 
-            // Ensure visual state is correct
             if (cardImage != null)
             {
                 cardImage.color = Color.white;
             }
         }
+
+        /// <summary>
+        /// Mark this card as passed (received from another player). Shows orange "P" on top-left.
+        /// </summary>
+        public void ShowPassBadge()
+        {
+            isPassedCard = true;
+            if (passBadge != null) { passBadge.SetActive(true); return; }
+
+            passBadge = new GameObject("PassBadge");
+            passBadge.transform.SetParent(transform, false);
+
+            RectTransform pRect = passBadge.AddComponent<RectTransform>();
+            pRect.anchorMin = new Vector2(0f, 1f);
+            pRect.anchorMax = new Vector2(0f, 1f);
+            pRect.pivot = new Vector2(0f, 1f);
+            pRect.anchoredPosition = new Vector2(2, -2);
+            pRect.sizeDelta = new Vector2(24, 24);
+
+            Image pBg = passBadge.AddComponent<Image>();
+            pBg.color = new Color(1f, 0.55f, 0.10f, 1f); // Orange
+            pBg.raycastTarget = false;
+
+            GameObject pTextObj = new GameObject("PText");
+            pTextObj.transform.SetParent(passBadge.transform, false);
+            RectTransform pTextRect = pTextObj.AddComponent<RectTransform>();
+            pTextRect.anchorMin = Vector2.zero;
+            pTextRect.anchorMax = Vector2.one;
+            pTextRect.sizeDelta = Vector2.zero;
+            var pText = pTextObj.AddComponent<TMPro.TextMeshProUGUI>();
+            pText.text = "P";
+            pText.fontSize = 14;
+            pText.fontStyle = TMPro.FontStyles.Bold;
+            pText.color = Color.white;
+            pText.alignment = TMPro.TextAlignmentOptions.Center;
+            pText.raycastTarget = false;
+        }
+
+        public void HidePassBadge()
+        {
+            isPassedCard = false;
+            if (passBadge != null) passBadge.SetActive(false);
+        }
+
+        public bool IsPassedCard => isPassedCard;
 
         /// <summary>
         /// Update the card sprite based on current state

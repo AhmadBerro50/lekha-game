@@ -59,6 +59,7 @@ namespace Lekha.UI
 
         // Passed cards display
         private Coroutine passedCardsCoroutine;
+        private GameObject passedCardsContainer; // Stays visible for the whole round
 
         // State
         private bool isTurnActive = false;
@@ -1202,13 +1203,27 @@ namespace Lekha.UI
         {
             if (cards == null || cards.Count == 0) return;
 
-            // Cancel any existing passed cards display
+            // Clear any existing display
+            ClearPassedCards();
+
+            passedCardsCoroutine = StartCoroutine(AnimatePassedCards(cards));
+        }
+
+        /// <summary>
+        /// Clear passed cards display (call at start of new round)
+        /// </summary>
+        public void ClearPassedCards()
+        {
             if (passedCardsCoroutine != null)
             {
                 StopCoroutine(passedCardsCoroutine);
+                passedCardsCoroutine = null;
             }
-
-            passedCardsCoroutine = StartCoroutine(AnimatePassedCards(cards));
+            if (passedCardsContainer != null)
+            {
+                Destroy(passedCardsContainer);
+                passedCardsContainer = null;
+            }
         }
 
         private System.Collections.IEnumerator AnimatePassedCards(List<Card> cards)
@@ -1292,42 +1307,15 @@ namespace Lekha.UI
                     cardImg.color = new Color(0.3f, 0.3f, 0.4f, 0.9f);
                 }
 
-                // Orange "P" badge on top-right corner
-                GameObject pBadge = new GameObject("PBadge");
-                pBadge.transform.SetParent(cardObj.transform, false);
-                RectTransform pRect = pBadge.AddComponent<RectTransform>();
-                pRect.anchorMin = new Vector2(0f, 1f);
-                pRect.anchorMax = new Vector2(0f, 1f);
-                pRect.pivot = new Vector2(0f, 1f);
-                pRect.anchoredPosition = new Vector2(-4, 4);
-                pRect.sizeDelta = new Vector2(20, 20);
-
-                Image pBg = pBadge.AddComponent<Image>();
-                pBg.color = new Color(1f, 0.55f, 0.10f, 1f); // Orange
-                pBg.raycastTarget = false;
-                if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
-                    pBg.sprite = ModernUITheme.Instance.CircleSprite;
-
-                GameObject pTextObj = new GameObject("PText");
-                pTextObj.transform.SetParent(pBadge.transform, false);
-                RectTransform pTextRect = pTextObj.AddComponent<RectTransform>();
-                pTextRect.anchorMin = Vector2.zero;
-                pTextRect.anchorMax = Vector2.one;
-                pTextRect.sizeDelta = Vector2.zero;
-                TextMeshProUGUI pText = pTextObj.AddComponent<TextMeshProUGUI>();
-                pText.text = "P";
-                pText.fontSize = 12;
-                pText.fontStyle = FontStyles.Bold;
-                pText.color = Color.white;
-                pText.alignment = TextAlignmentOptions.Center;
-                pText.raycastTarget = false;
-
                 LayoutElement le = cardObj.AddComponent<LayoutElement>();
                 le.preferredWidth = cw;
                 le.preferredHeight = ch;
             }
 
-            // Fade in
+            // Store reference so we can clear it on new round
+            passedCardsContainer = container;
+
+            // Fade in and stay visible for the whole round
             float fadeInTime = 0.3f;
             float elapsed = 0f;
             while (elapsed < fadeInTime)
@@ -1337,22 +1325,6 @@ namespace Lekha.UI
                 yield return null;
             }
             cg.alpha = 1f;
-
-            // Hold for 3 seconds
-            yield return new WaitForSeconds(3f);
-
-            // Fade out
-            float fadeOutTime = 0.5f;
-            elapsed = 0f;
-            while (elapsed < fadeOutTime)
-            {
-                elapsed += Time.deltaTime;
-                cg.alpha = Mathf.Lerp(1f, 0f, elapsed / fadeOutTime);
-                yield return null;
-            }
-
-            // Cleanup
-            Destroy(container);
             passedCardsCoroutine = null;
         }
 

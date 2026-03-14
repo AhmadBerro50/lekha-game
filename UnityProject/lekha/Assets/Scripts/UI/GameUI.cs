@@ -61,6 +61,7 @@ namespace Lekha.UI
         private List<CardUI> playerHandCards = new List<CardUI>();
         private List<CardUI> trickCards = new List<CardUI>();
         private List<CardUI> selectedForPass = new List<CardUI>();
+        private HashSet<Card> cardsPassedToMe = new HashSet<Card>(); // Track cards received via pass
         private bool isPassPhase = false;
         private bool isAnimating = false; // Block during deal/pass animations
         private bool isProcessingPlay = false; // Prevent double-plays
@@ -1717,14 +1718,28 @@ namespace Lekha.UI
         /// </summary>
         private void OnPassCardsReceived(PlayerPosition fromPos, List<Card> cards)
         {
-            // Show the received cards above the LOCAL player's panel with the P badge
-            Player localPlayer = GameManager.Instance?.GetHumanPlayer();
-            if (localPlayer == null) return;
+            // Track these cards so we can mark them with "P" in the hand
+            foreach (var c in cards)
+                cardsPassedToMe.Add(c);
 
-            if (playerInfoPanels.TryGetValue(localPlayer.Position, out PlayerInfoPanel myPanel))
+            Debug.Log($"[OnPassCardsReceived] Received {cards.Count} cards from {fromPos}, marking in hand");
+
+            // Mark any existing hand cards that match
+            MarkPassedCardsInHand();
+        }
+
+        /// <summary>
+        /// Mark cards in hand that were passed to us with the orange "P" badge
+        /// </summary>
+        private void MarkPassedCardsInHand()
+        {
+            if (cardsPassedToMe.Count == 0) return;
+            foreach (var cardUI in playerHandCards)
             {
-                myPanel.ShowPassedCards(cards);
-                Debug.Log($"[OnPassCardsReceived] Showing {cards.Count} cards received from {fromPos} above local player panel");
+                if (cardUI != null && cardUI.Card != null && cardsPassedToMe.Contains(cardUI.Card))
+                {
+                    cardUI.ShowPassBadge();
+                }
             }
         }
 
@@ -1829,6 +1844,10 @@ namespace Lekha.UI
             isPassPhase = false;
             isProcessingPlay = false;
             selectedForPass.Clear();
+            cardsPassedToMe.Clear(); // Reset passed card tracking for new round
+            // Clear passed cards display on all panels
+            foreach (var kvp in playerInfoPanels)
+                kvp.Value?.ClearPassedCards();
             nextAllowedPlayTime = 0f;
             StopTransientCoroutines();
             ClearTrickArea();
@@ -2820,6 +2839,7 @@ namespace Lekha.UI
             isAnimating = true;
             DisplayPlayerHandAnimatedWithCallback(() => {
                 isAnimating = false;
+                MarkPassedCardsInHand(); // Show "P" on cards received from pass
                 Debug.Log("[OnPassPhaseComplete] Hand animation complete, isAnimating = false");
             });
             isPassPhase = false;
