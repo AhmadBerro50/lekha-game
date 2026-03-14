@@ -62,6 +62,11 @@ namespace Lekha.Network
         GameOver,
         GameState,
         BotReplaced,
+        TurnUpdate,
+        TurnTimeout,
+
+        // Lobby (extended)
+        JoinRoomByCode,
 
         // Social
         EmojiReaction,

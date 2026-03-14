@@ -157,6 +157,10 @@ namespace Lekha.Network
         public event Action<PlayerPosition, string> OnPlayerReconnectedUI;  // pos, name
         public event Action<PlayerPosition, string> OnBotReplacedUI;  // pos, name
 
+        // Server turn authority events
+        public event Action<string> OnTurnUpdate;     // position string
+        public event Action<string> OnTurnTimeout;    // position string
+
         // Pending actions queue
         private Queue<Action> pendingActions = new Queue<Action>();
 
@@ -321,6 +325,14 @@ namespace Lekha.Network
 
                 case NetworkMessageType.GameState:
                     HandleGameStateSync(message);
+                    break;
+
+                case NetworkMessageType.TurnUpdate:
+                    HandleTurnUpdate(message);
+                    break;
+
+                case NetworkMessageType.TurnTimeout:
+                    HandleTurnTimeout(message);
                     break;
             }
         }
@@ -614,6 +626,44 @@ namespace Lekha.Network
             }
         }
 
+        private void HandleTurnUpdate(NetworkMessage message)
+        {
+            try
+            {
+                var data = JsonUtility.FromJson<TurnUpdateData>(message.Data);
+                if (data != null && !string.IsNullOrEmpty(data.Position))
+                {
+                    Debug.Log($"[NetworkGameSync] TurnUpdate received: {data.Position}");
+                    pendingActions.Enqueue(() => {
+                        OnTurnUpdate?.Invoke(data.Position);
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[NetworkGameSync] Error parsing TurnUpdate: {e.Message}");
+            }
+        }
+
+        private void HandleTurnTimeout(NetworkMessage message)
+        {
+            try
+            {
+                var data = JsonUtility.FromJson<TurnUpdateData>(message.Data);
+                if (data != null && !string.IsNullOrEmpty(data.Position))
+                {
+                    Debug.Log($"[NetworkGameSync] TurnTimeout received for: {data.Position}");
+                    pendingActions.Enqueue(() => {
+                        OnTurnTimeout?.Invoke(data.Position);
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[NetworkGameSync] Error parsing TurnTimeout: {e.Message}");
+            }
+        }
+
         private void HandleGameStateSync(NetworkMessage message)
         {
             try
@@ -808,5 +858,14 @@ namespace Lekha.Network
             public string StartingPosition; // Who leads the first trick
             public int RoundNumber;
         }
+    }
+
+    /// <summary>
+    /// Data for server turn authority messages (TurnUpdate and TurnTimeout)
+    /// </summary>
+    [Serializable]
+    public class TurnUpdateData
+    {
+        public string Position;
     }
 }

@@ -216,6 +216,8 @@ namespace Lekha.UI
                 NetworkGameSync.Instance.OnPlayerDisconnectedUI -= OnPlayerDisconnectedUI;
                 NetworkGameSync.Instance.OnPlayerReconnectedUI -= OnPlayerReconnectedUI;
                 NetworkGameSync.Instance.OnBotReplacedUI -= OnBotReplacedUI;
+                NetworkGameSync.Instance.OnTurnUpdate -= OnServerTurnUpdate;
+                NetworkGameSync.Instance.OnTurnTimeout -= OnServerTurnTimeout;
             }
 
             // Unsubscribe from emoji events
@@ -1636,6 +1638,8 @@ namespace Lekha.UI
                     NetworkGameSync.Instance.OnPlayerDisconnectedUI += OnPlayerDisconnectedUI;
                     NetworkGameSync.Instance.OnPlayerReconnectedUI += OnPlayerReconnectedUI;
                     NetworkGameSync.Instance.OnBotReplacedUI += OnBotReplacedUI;
+                    NetworkGameSync.Instance.OnTurnUpdate += OnServerTurnUpdate;
+                    NetworkGameSync.Instance.OnTurnTimeout += OnServerTurnTimeout;
                 }
 
                 // Subscribe to emoji reactions from other players
@@ -2393,6 +2397,68 @@ namespace Lekha.UI
             {
                 HighlightPlayableCards();
             }
+        }
+
+        /// <summary>
+        /// Handle server TurnUpdate - sync local turn state to server authority
+        /// </summary>
+        private void OnServerTurnUpdate(string positionStr)
+        {
+            if (GameManager.Instance == null) return;
+            if (GameManager.Instance.CurrentState != GameState.PlayingTricks) return;
+
+            if (!System.Enum.TryParse<PlayerPosition>(positionStr, out PlayerPosition serverPos))
+            {
+                Debug.LogWarning($"[GameUI] OnServerTurnUpdate: could not parse position '{positionStr}'");
+                return;
+            }
+
+            // If the server says it's a different player's turn than what we think, sync up
+            if (GameManager.Instance.CurrentPlayer.Position != serverPos)
+            {
+                Debug.Log($"[GameUI] Server turn authority: syncing to {serverPos} (local was {GameManager.Instance.CurrentPlayer.Position})");
+                GameManager.Instance.ForceSetCurrentPlayer(serverPos);
+            }
+
+            // Reset watchdog since server confirmed a turn change
+            ResetWatchdogTimer();
+            UpdateTurnIndicator();
+            UpdateInstructionText();
+        }
+
+        /// <summary>
+        /// Handle server TurnTimeout - a player took too long (30s)
+        /// </summary>
+        private void OnServerTurnTimeout(string positionStr)
+        {
+            if (GameManager.Instance == null) return;
+            if (GameManager.Instance.CurrentState != GameState.PlayingTricks) return;
+
+            if (!System.Enum.TryParse<PlayerPosition>(positionStr, out PlayerPosition timedOutPos))
+            {
+                Debug.LogWarning($"[GameUI] OnServerTurnTimeout: could not parse position '{positionStr}'");
+                return;
+            }
+
+            Debug.LogWarning($"[GameUI] TurnTimeout for {timedOutPos}");
+
+            // If it's the local player's turn, re-highlight playable cards (maybe they missed it)
+            if (GameManager.Instance.IsOnlineGame && GameManager.Instance.LocalPlayerPosition.HasValue
+                && timedOutPos == GameManager.Instance.LocalPlayerPosition.Value)
+            {
+                Debug.Log("[GameUI] TurnTimeout: local player timed out, re-highlighting playable cards");
+                HighlightPlayableCards();
+            }
+
+            // If host and the timed-out player is disconnected/bot, trigger AI play
+            if (NetworkGameSync.Instance != null && NetworkGameSync.Instance.IsHost
+                && GameManager.Instance.IsPlayerDisconnectedOrBot(timedOutPos))
+            {
+                Debug.Log($"[GameUI] TurnTimeout: host triggering AI play for disconnected/bot {timedOutPos}");
+                TriggerDisconnectedPlayerAI();
+            }
+
+            ResetWatchdogTimer();
         }
 
         /// <summary>

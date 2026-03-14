@@ -1013,6 +1013,20 @@ namespace Lekha.GameLogic
         public IReadOnlyCollection<PlayerPosition> BotReplacedPositions => botReplacedPositions;
 
         /// <summary>
+        /// Force-set the current player from server turn authority.
+        /// Used when server sends TurnUpdate to keep clients in sync.
+        /// </summary>
+        public void ForceSetCurrentPlayer(PlayerPosition position)
+        {
+            int idx = GetPlayerIndexAtPosition(position);
+            if (idx != currentPlayerIndex)
+            {
+                Debug.Log($"[GameManager] Server turn authority: advancing to {position} (was {CurrentPlayer.PlayerName})");
+                currentPlayerIndex = idx;
+            }
+        }
+
+        /// <summary>
         /// Set player names from network player data for online games
         /// </summary>
         public void SetNetworkPlayerNames(Dictionary<PlayerPosition, string> playerNames)
