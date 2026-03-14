@@ -675,8 +675,19 @@ namespace Lekha.UI
 
         private void ApplyBundledAvatar(string avatarName)
         {
-            Texture2D tex = Resources.Load<Texture2D>($"Avatars/{avatarName}");
-            if (tex == null) return;
+            Texture2D src = Resources.Load<Texture2D>($"Avatars/{avatarName}");
+            if (src == null) return;
+
+            // Copy to a readable texture (Resources textures are not readable by default)
+            RenderTexture rt = RenderTexture.GetTemporary(src.width, src.height, 0);
+            Graphics.Blit(src, rt);
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            Texture2D tex = new Texture2D(src.width, src.height, TextureFormat.RGBA32, false);
+            tex.ReadPixels(new Rect(0, 0, src.width, src.height), 0, 0);
+            tex.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
 
             // Save to profile
             PlayerProfileManager.Instance?.SetAvatar(tex);
