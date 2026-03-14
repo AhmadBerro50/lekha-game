@@ -178,7 +178,7 @@ namespace Lekha.UI
 
         private void CreateLuxuryBackground(Transform parent)
         {
-            // ── Layer 1: Smooth vertical gradient (dark navy top → deep black bottom) ──
+            // ── Layer 1: Custom background image from Resources ──
             GameObject bgObj = new GameObject("Background");
             bgObj.transform.SetParent(parent, false);
 
@@ -188,61 +188,24 @@ namespace Lekha.UI
             bgRect.sizeDelta = Vector2.zero;
 
             Image bgImg = bgObj.AddComponent<Image>();
-
-            int texW = 4, texH = 256;
-            Texture2D gradientTex = new Texture2D(texW, texH, TextureFormat.RGBA32, false);
-            gradientTex.filterMode = FilterMode.Bilinear;
-            gradientTex.wrapMode = TextureWrapMode.Clamp;
-
-            Color topColor    = new Color(0.06f, 0.22f, 0.38f, 1f); // Deep teal top
-            Color midColor    = new Color(0.04f, 0.12f, 0.24f, 1f); // Dark ocean mid
-            Color bottomColor = new Color(0.02f, 0.05f, 0.12f, 1f); // Midnight bottom
-
-            for (int y = 0; y < texH; y++)
-            {
-                float t = (float)y / (texH - 1); // 0 = bottom, 1 = top
-                Color c;
-                if (t < 0.5f)
-                    c = Color.Lerp(bottomColor, midColor, t / 0.5f);
-                else
-                    c = Color.Lerp(midColor, topColor, (t - 0.5f) / 0.5f);
-
-                for (int x = 0; x < texW; x++)
-                    gradientTex.SetPixel(x, y, c);
-            }
-            gradientTex.Apply();
-            bgImg.sprite = Sprite.Create(gradientTex, new Rect(0, 0, texW, texH), new Vector2(0.5f, 0.5f));
             bgImg.raycastTarget = false;
 
-            // ── Layer 2: Subtle centre spotlight ──────────────────────────────
-            GameObject spotObj = new GameObject("CentreSpot");
-            spotObj.transform.SetParent(parent, false);
-            RectTransform spotRect = spotObj.AddComponent<RectTransform>();
-            spotRect.anchorMin = Vector2.zero;
-            spotRect.anchorMax = Vector2.one;
-            spotRect.sizeDelta = Vector2.zero;
+            Texture2D bgTex = Resources.Load<Texture2D>("backgrounds/background");
+            if (bgTex != null)
+            {
+                bgImg.sprite = Sprite.Create(bgTex, new Rect(0, 0, bgTex.width, bgTex.height), new Vector2(0.5f, 0.5f));
+                bgImg.color = Color.white;
+            }
+            else
+            {
+                Debug.LogWarning("[PremiumMainMenu] Failed to load backgrounds/background, using fallback color");
+                bgImg.color = new Color(0.02f, 0.05f, 0.12f, 1f);
+            }
 
-            Image spotImg = spotObj.AddComponent<Image>();
-            int spotSize = 256;
-            Texture2D spotTex = new Texture2D(spotSize, spotSize, TextureFormat.RGBA32, false);
-            spotTex.filterMode = FilterMode.Bilinear;
-            Vector2 sc = new Vector2(spotSize / 2f, spotSize / 2f);
-            for (int y = 0; y < spotSize; y++)
-                for (int x = 0; x < spotSize; x++)
-                {
-                    float d = Vector2.Distance(new Vector2(x, y), sc) / (spotSize / 2f);
-                    float a = Mathf.Pow(Mathf.Max(0, 1f - d), 2.5f);
-                    spotTex.SetPixel(x, y, new Color(1, 1, 1, a));
-                }
-            spotTex.Apply();
-            spotImg.sprite = Sprite.Create(spotTex, new Rect(0, 0, spotSize, spotSize), new Vector2(0.5f, 0.5f));
-            spotImg.color = new Color(0.10f, 0.35f, 0.50f, 0.25f); // Teal centre glow
-            spotImg.raycastTarget = false;
-
-            // ── Layer 3: Soft vignette (darkens edges naturally) ──────────────
+            // ── Layer 2: Soft vignette (darkens edges naturally) ──────────────
             CreateVignette(parent);
 
-            // ── Layer 4: Floating particles (fewer, subtler) ─────────────────
+            // ── Layer 3: Floating particles (fewer, subtler) ─────────────────
             CreateAnimatedBackground(parent);
         }
 
@@ -620,7 +583,7 @@ namespace Lekha.UI
             subRect.sizeDelta = new Vector2(400, 40);
 
             TextMeshProUGUI subTmp = subObj.AddComponent<TextMeshProUGUI>();
-            subTmp.text = "Classic Card Game";
+            subTmp.text = "Fo2 Fo2 Fo2";
             subTmp.fontSize = 26;
             subTmp.alignment = TextAlignmentOptions.Center;
             subTmp.color = TextMuted;
@@ -1147,7 +1110,7 @@ namespace Lekha.UI
             subRect.sizeDelta = new Vector2(400, 35);
 
             TextMeshProUGUI subTmp = subObj.AddComponent<TextMeshProUGUI>();
-            subTmp.text = "Classic Card Game";
+            subTmp.text = "Fo2 Fo2 Fo2";
             subTmp.fontSize = 22;
             subTmp.alignment = TextAlignmentOptions.Center;
             subTmp.color = TextMuted;

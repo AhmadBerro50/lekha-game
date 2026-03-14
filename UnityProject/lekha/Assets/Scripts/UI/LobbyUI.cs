@@ -134,23 +134,19 @@ namespace Lekha.UI
 
         private Sprite CreateVerticalGradientSprite(int height)
         {
-            Texture2D tex = new Texture2D(1, height, TextureFormat.RGBA32, false);
-            tex.filterMode = FilterMode.Bilinear;
-            tex.wrapMode = TextureWrapMode.Clamp;
-
-            // Modern gradient from deep navy to purple
-            Color topColor = new Color(0.12f, 0.08f, 0.22f, 1f);
-            Color bottomColor = new Color(0.06f, 0.08f, 0.14f, 1f);
-
-            for (int y = 0; y < height; y++)
+            // Load custom background image from Resources
+            Texture2D bgTex = Resources.Load<Texture2D>("backgrounds/background");
+            if (bgTex != null)
             {
-                float t = (float)y / (height - 1);
-                Color c = Color.Lerp(bottomColor, topColor, t);
-                tex.SetPixel(0, y, c);
+                return Sprite.Create(bgTex, new Rect(0, 0, bgTex.width, bgTex.height), new Vector2(0.5f, 0.5f));
             }
 
+            // Fallback: solid dark color
+            Debug.LogWarning("[LobbyUI] Failed to load backgrounds/background, using fallback color");
+            Texture2D tex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            tex.SetPixel(0, 0, new Color(0.04f, 0.08f, 0.14f, 1f));
             tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, 1, height), new Vector2(0.5f, 0.5f));
+            return Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f));
         }
 
         private Sprite CreateRoundedSprite(int width, int height, int radius)
