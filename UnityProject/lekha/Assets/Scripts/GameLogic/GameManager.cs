@@ -324,22 +324,14 @@ namespace Lekha.GameLogic
             if (currentState == GameState.PassingCards)
             {
                 Debug.LogError($"[GameManager] Pass phase timeout after {PASS_PHASE_TIMEOUT}s — forcing completion");
-                // If local player hasn't submitted, auto-submit first 3 cards
-                if (!localPassSubmitted)
-                {
-                    Player local = GetHumanPlayer();
-                    if (local != null && local.Hand.Count >= 3)
-                    {
-                        var autoPass = local.Hand.Take(3).ToList();
-                        Debug.LogWarning($"[GameManager] Auto-passing 3 cards for timeout: {string.Join(", ", autoPass.Select(c => c.GetUnoName()))}");
-                        // Submit them through the normal path
-                        var passDict = new Dictionary<Player, List<Card>> { { local, autoPass } };
-                        OnPassPhaseComplete?.Invoke();
-                    }
-                    localPassSubmitted = true;
-                }
-                // Force complete
-                CompleteOnlinePassPhase();
+                localPassSubmitted = true; // Prevent buffered cards from re-triggering
+                bufferedPassCards = null;
+                // Skip directly to trick phase — don't fire OnPassPhaseComplete twice
+                CancelPassPhaseTimeout();
+                receivedPassFrom.Clear();
+                Debug.LogWarning("[GameManager] Forcing transition to trick phase");
+                OnPassPhaseComplete?.Invoke();
+                StartTrickPhase();
             }
             passPhaseTimeoutCoroutine = null;
         }
@@ -1018,6 +1010,11 @@ namespace Lekha.GameLogic
         /// </summary>
         public void ForceSetCurrentPlayer(PlayerPosition position)
         {
+            // Don't force during non-playing states
+            if (currentState != GameState.PlayingTricks) return;
+            // Don't force if a remote play is being processed right now
+            if (isProcessingRemotePlay) return;
+
             int idx = GetPlayerIndexAtPosition(position);
             if (idx != currentPlayerIndex)
             {

@@ -2366,6 +2366,8 @@ namespace Lekha.UI
         {
             if (GameManager.Instance == null) return;
             if (GameManager.Instance.CurrentState != GameState.PlayingTricks) return;
+            // Don't force turn update while we're processing a card play
+            if (isProcessingPlay) return;
 
             if (!System.Enum.TryParse<PlayerPosition>(positionStr, out PlayerPosition serverPos))
             {
