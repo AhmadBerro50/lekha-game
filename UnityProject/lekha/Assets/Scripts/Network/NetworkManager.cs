@@ -506,7 +506,7 @@ namespace Lekha.Network
 
         private void SendProfileInfo()
         {
-            // Send our profile to the server
+            if (LocalPlayer == null) { Debug.LogWarning("[NetworkManager] SendProfileInfo: LocalPlayer is null"); return; }
             Debug.Log($"[NetworkManager] SendProfileInfo - Sending DisplayName: '{LocalPlayer.DisplayName}'");
 
             var profileData = new ProfileInfoData
@@ -916,7 +916,7 @@ namespace Lekha.Network
                 var player = JsonUtility.FromJson<NetworkPlayer>(message.Data);
                 OnPlayerJoined?.Invoke(player);
             }
-            catch { }
+            catch (System.Exception ex) { Debug.LogWarning($"[NetworkManager] Parse error: {ex.Message}"); }
         }
 
         private void HandlePlayerLeft(NetworkMessage message)
@@ -927,7 +927,7 @@ namespace Lekha.Network
                 var player = new NetworkPlayer(data.PlayerId, data.Name);
                 OnPlayerLeft?.Invoke(player);
             }
-            catch { }
+            catch (System.Exception ex) { Debug.LogWarning($"[NetworkManager] Parse error: {ex.Message}"); }
         }
 
         [Serializable]
@@ -1112,7 +1112,7 @@ namespace Lekha.Network
                 SetState(ConnectionState.InGame);
                 OnGameStarted?.Invoke(data.RoomId);
             }
-            catch { }
+            catch (System.Exception ex) { Debug.LogWarning($"[NetworkManager] Parse error: {ex.Message}"); }
         }
 
         [Serializable]
@@ -1125,7 +1125,7 @@ namespace Lekha.Network
                 var data = JsonUtility.FromJson<SpectatorData>(message.Data);
                 OnSpectatorJoined?.Invoke(data.PlayerId, data.Name);
             }
-            catch { }
+            catch (System.Exception ex) { Debug.LogWarning($"[NetworkManager] Parse error: {ex.Message}"); }
         }
 
         private void HandleSpectatorLeft(NetworkMessage message)
@@ -1135,7 +1135,7 @@ namespace Lekha.Network
                 var data = JsonUtility.FromJson<SpectatorData>(message.Data);
                 OnSpectatorLeft?.Invoke(data.PlayerId, data.Name);
             }
-            catch { }
+            catch (System.Exception ex) { Debug.LogWarning($"[NetworkManager] Parse error: {ex.Message}"); }
         }
 
         [Serializable]
@@ -1159,7 +1159,7 @@ namespace Lekha.Network
                 {
                     webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnecting", CancellationToken.None);
                 }
-                catch { }
+                catch (System.Exception ex) { Debug.LogWarning($"[NetworkManager] Parse error: {ex.Message}"); }
             }
 
             webSocket = null;

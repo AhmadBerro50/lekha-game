@@ -135,6 +135,10 @@ namespace Lekha.GameLogic
                 {
                     NetworkGameSync.Instance.InitializeOnlineGame(positionStr, isHost);
                 }
+                else
+                {
+                    Debug.LogError("[GameController] NetworkGameSync.Instance is null — online game cannot initialize!");
+                }
 
                 // Configure GameManager for online play
                 if (System.Enum.TryParse<Lekha.Core.PlayerPosition>(positionStr, out var localPosition))
@@ -168,9 +172,9 @@ namespace Lekha.GameLogic
                     GameManager.Instance.PrepareForOnlineGame();
                 }
 
-                // Join Agora voice channel and show UI
-                JoinVoiceChat();
+                // Create voice UI first, then join channel (so UI catches early events)
                 CreateInGameVoiceChatUI();
+                JoinVoiceChat();
             }
             else
             {
