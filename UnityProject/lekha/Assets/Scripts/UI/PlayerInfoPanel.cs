@@ -598,8 +598,8 @@ namespace Lekha.UI
             containerRect.anchorMin = new Vector2(0.5f, 0f);
             containerRect.anchorMax = new Vector2(0.5f, 0f);
             containerRect.pivot = new Vector2(0.5f, 1f);
-            containerRect.anchoredPosition = new Vector2(0, -2);
-            containerRect.sizeDelta = new Vector2(110, 55);
+            containerRect.anchoredPosition = new Vector2(0, -4);
+            containerRect.sizeDelta = new Vector2(130, 75);
 
             // Add canvas to ensure it renders on top
             Canvas containerCanvas = specialCardsContainer.AddComponent<Canvas>();
@@ -634,7 +634,7 @@ namespace Lekha.UI
             iconObj.transform.SetParent(parent, false);
 
             RectTransform iconRect = iconObj.AddComponent<RectTransform>();
-            iconRect.sizeDelta = new Vector2(30, 45);
+            iconRect.sizeDelta = new Vector2(42, 60);
 
             // Background with glass effect
             Image bg = iconObj.AddComponent<Image>();
@@ -706,10 +706,10 @@ namespace Lekha.UI
 
             // Add layout element for proper sizing
             LayoutElement layoutElem = iconObj.AddComponent<LayoutElement>();
-            layoutElem.preferredWidth = 30;
-            layoutElem.preferredHeight = 45;
-            layoutElem.minWidth = 30;
-            layoutElem.minHeight = 45;
+            layoutElem.preferredWidth = 42;
+            layoutElem.preferredHeight = 60;
+            layoutElem.minWidth = 42;
+            layoutElem.minHeight = 60;
 
             return bg;
         }
@@ -1291,6 +1291,36 @@ namespace Lekha.UI
                 {
                     cardImg.color = new Color(0.3f, 0.3f, 0.4f, 0.9f);
                 }
+
+                // Orange "P" badge on top-right corner
+                GameObject pBadge = new GameObject("PBadge");
+                pBadge.transform.SetParent(cardObj.transform, false);
+                RectTransform pRect = pBadge.AddComponent<RectTransform>();
+                pRect.anchorMin = new Vector2(1f, 1f);
+                pRect.anchorMax = new Vector2(1f, 1f);
+                pRect.pivot = new Vector2(1f, 1f);
+                pRect.anchoredPosition = new Vector2(4, 4);
+                pRect.sizeDelta = new Vector2(20, 20);
+
+                Image pBg = pBadge.AddComponent<Image>();
+                pBg.color = new Color(1f, 0.55f, 0.10f, 1f); // Orange
+                pBg.raycastTarget = false;
+                if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
+                    pBg.sprite = ModernUITheme.Instance.CircleSprite;
+
+                GameObject pTextObj = new GameObject("PText");
+                pTextObj.transform.SetParent(pBadge.transform, false);
+                RectTransform pTextRect = pTextObj.AddComponent<RectTransform>();
+                pTextRect.anchorMin = Vector2.zero;
+                pTextRect.anchorMax = Vector2.one;
+                pTextRect.sizeDelta = Vector2.zero;
+                TextMeshProUGUI pText = pTextObj.AddComponent<TextMeshProUGUI>();
+                pText.text = "P";
+                pText.fontSize = 12;
+                pText.fontStyle = FontStyles.Bold;
+                pText.color = Color.white;
+                pText.alignment = TextAlignmentOptions.Center;
+                pText.raycastTarget = false;
 
                 LayoutElement le = cardObj.AddComponent<LayoutElement>();
                 le.preferredWidth = cw;
