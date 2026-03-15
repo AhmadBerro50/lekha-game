@@ -84,6 +84,12 @@ namespace Lekha.UI
         // Spectator info button reference
         private Button infoButton;
 
+        // Spectator player selection
+        private GameObject spectatorOverlay;
+        private GameObject spectatorSwitchButton;
+        private PlayerPosition? spectatorWatchPosition = null;
+        private TextMeshProUGUI spectatorWatchLabel; // "Watching [Name]'s hand"
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -256,6 +262,7 @@ namespace Lekha.UI
                 NetworkGameSync.Instance.OnBotReplacedUI -= OnBotReplacedUI;
                 NetworkGameSync.Instance.OnTurnUpdate -= OnServerTurnUpdate;
                 NetworkGameSync.Instance.OnTurnTimeout -= OnServerTurnTimeout;
+                NetworkGameSync.Instance.OnSpectatorHandReceived -= OnSpectatorHandReceived;
             }
 
             // Unsubscribe from emoji events
@@ -477,6 +484,9 @@ namespace Lekha.UI
 
             // Create info button (top-left, available for all players)
             infoButton = CreateInfoButton(canvasTransform);
+
+            // Create spectator UI elements (hidden until spectating)
+            CreateSpectatorUI(canvasTransform);
 
             // Create disconnect notification banner (centered, for online games)
             DisconnectNotification.Create(canvasTransform);
@@ -839,6 +849,278 @@ namespace Lekha.UI
             iconTmp.raycastTarget = false;
 
             return btn;
+        }
+
+        /// <summary>
+        /// Create spectator UI: player selection overlay + switch button + watch label.
+        /// </summary>
+        private void CreateSpectatorUI(Transform parent)
+        {
+            // --- Player Selection Overlay (shown when spectator first enters) ---
+            spectatorOverlay = new GameObject("SpectatorOverlay");
+            spectatorOverlay.transform.SetParent(parent, false);
+            spectatorOverlay.transform.SetAsLastSibling();
+
+            RectTransform overlayRect = spectatorOverlay.AddComponent<RectTransform>();
+            overlayRect.anchorMin = Vector2.zero;
+            overlayRect.anchorMax = Vector2.one;
+            overlayRect.sizeDelta = Vector2.zero;
+
+            // Semi-transparent background
+            Image overlayBg = spectatorOverlay.AddComponent<Image>();
+            overlayBg.color = new Color(0.02f, 0.03f, 0.06f, 0.85f);
+
+            // Title
+            GameObject titleObj = new GameObject("Title");
+            titleObj.transform.SetParent(spectatorOverlay.transform, false);
+            RectTransform titleRect = titleObj.AddComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0.5f, 0.5f);
+            titleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            titleRect.anchoredPosition = new Vector2(0, 180);
+            titleRect.sizeDelta = new Vector2(500, 60);
+            TextMeshProUGUI titleTmp = titleObj.AddComponent<TextMeshProUGUI>();
+            titleTmp.text = "Choose a player to watch";
+            titleTmp.fontSize = 32;
+            titleTmp.alignment = TextAlignmentOptions.Center;
+            titleTmp.color = new Color(0.95f, 0.95f, 0.95f, 1f);
+            titleTmp.fontStyle = FontStyles.Bold;
+            titleTmp.raycastTarget = false;
+
+            // 4 player buttons in a 2x2 grid
+            string[] positionNames = { "South", "East", "North", "West" };
+            Vector2[] buttonPositions = {
+                new Vector2(-120, 40),  // South - bottom left
+                new Vector2(120, 40),   // East - bottom right
+                new Vector2(-120, -60), // North - top left (swapped for visual clarity)
+                new Vector2(120, -60)   // West - top right
+            };
+
+            Color btnColor = new Color(0.15f, 0.14f, 0.28f, 0.95f);
+            Color btnHighlight = new Color(0.25f, 0.24f, 0.38f, 1f);
+
+            for (int i = 0; i < 4; i++)
+            {
+                string posName = positionNames[i];
+                GameObject btnObj = new GameObject($"Watch_{posName}");
+                btnObj.transform.SetParent(spectatorOverlay.transform, false);
+
+                RectTransform btnRect = btnObj.AddComponent<RectTransform>();
+                btnRect.anchorMin = new Vector2(0.5f, 0.5f);
+                btnRect.anchorMax = new Vector2(0.5f, 0.5f);
+                btnRect.anchoredPosition = buttonPositions[i];
+                btnRect.sizeDelta = new Vector2(200, 70);
+
+                Image btnImg = btnObj.AddComponent<Image>();
+                btnImg.color = btnColor;
+                if (ModernUITheme.Instance != null && ModernUITheme.Instance.GlassPanelDarkSprite != null)
+                    btnImg.sprite = ModernUITheme.Instance.GlassPanelDarkSprite;
+                btnImg.type = Image.Type.Sliced;
+
+                Button btn = btnObj.AddComponent<Button>();
+                btn.targetGraphic = btnImg;
+                ColorBlock colors = btn.colors;
+                colors.normalColor = Color.white;
+                colors.highlightedColor = new Color(1.2f, 1.2f, 1.2f, 1f);
+                colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+                btn.colors = colors;
+
+                // Button label
+                GameObject labelObj = new GameObject("Label");
+                labelObj.transform.SetParent(btnObj.transform, false);
+                RectTransform labelRect = labelObj.AddComponent<RectTransform>();
+                labelRect.anchorMin = Vector2.zero;
+                labelRect.anchorMax = Vector2.one;
+                labelRect.sizeDelta = Vector2.zero;
+
+                TextMeshProUGUI labelTmp = labelObj.AddComponent<TextMeshProUGUI>();
+                // Will be updated with actual player name when available
+                labelTmp.text = posName;
+                labelTmp.fontSize = 22;
+                labelTmp.alignment = TextAlignmentOptions.Center;
+                labelTmp.color = new Color(0.9f, 0.88f, 0.82f, 1f);
+                labelTmp.fontStyle = FontStyles.Bold;
+                labelTmp.raycastTarget = false;
+
+                string capturedPos = posName;
+                btn.onClick.AddListener(() => {
+                    SoundManager.Instance?.PlayButtonClick();
+                    OnSpectatorSelectPlayer(capturedPos);
+                });
+            }
+
+            spectatorOverlay.SetActive(false); // Hidden until spectating starts
+
+            // --- Switch Button (small, top-left, shown while watching) ---
+            spectatorSwitchButton = new GameObject("SpectatorSwitchBtn");
+            spectatorSwitchButton.transform.SetParent(parent, false);
+
+            RectTransform switchRect = spectatorSwitchButton.AddComponent<RectTransform>();
+            switchRect.anchorMin = new Vector2(0, 1);
+            switchRect.anchorMax = new Vector2(0, 1);
+            switchRect.anchoredPosition = new Vector2(130, -50);
+            switchRect.sizeDelta = new Vector2(50, 50);
+
+            Image switchImg = spectatorSwitchButton.AddComponent<Image>();
+            switchImg.color = new Color(0.16f, 0.14f, 0.28f, 0.95f);
+            if (ModernUITheme.Instance != null && ModernUITheme.Instance.CircleSprite != null)
+                switchImg.sprite = ModernUITheme.Instance.CircleSprite;
+
+            Button switchBtn = spectatorSwitchButton.AddComponent<Button>();
+            switchBtn.targetGraphic = switchImg;
+
+            ColorBlock switchColors = switchBtn.colors;
+            switchColors.normalColor = Color.white;
+            switchColors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+            switchColors.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+            switchBtn.colors = switchColors;
+
+            // Eye icon
+            GameObject eyeObj = new GameObject("Icon");
+            eyeObj.transform.SetParent(spectatorSwitchButton.transform, false);
+            RectTransform eyeRect = eyeObj.AddComponent<RectTransform>();
+            eyeRect.anchorMin = Vector2.zero;
+            eyeRect.anchorMax = Vector2.one;
+            eyeRect.sizeDelta = Vector2.zero;
+
+            TextMeshProUGUI eyeTmp = eyeObj.AddComponent<TextMeshProUGUI>();
+            eyeTmp.text = "\u21C4"; // swap arrows character
+            eyeTmp.fontSize = 22;
+            eyeTmp.alignment = TextAlignmentOptions.Center;
+            eyeTmp.color = new Color(0.3f, 0.85f, 0.55f, 1f);
+            eyeTmp.fontStyle = FontStyles.Bold;
+            eyeTmp.raycastTarget = false;
+
+            switchBtn.onClick.AddListener(() => {
+                SoundManager.Instance?.PlayButtonClick();
+                ShowSpectatorOverlay();
+            });
+
+            spectatorSwitchButton.SetActive(false); // Hidden until a player is chosen
+
+            // --- Watch Label (bottom area, replaces instruction text for spectators) ---
+            // We'll reuse instructionText for this purpose
+        }
+
+        /// <summary>
+        /// Update spectator overlay button labels with actual player names.
+        /// </summary>
+        private void UpdateSpectatorOverlayNames()
+        {
+            if (spectatorOverlay == null) return;
+
+            string[] positionNames = { "South", "East", "North", "West" };
+            foreach (string posName in positionNames)
+            {
+                Transform btnTransform = spectatorOverlay.transform.Find($"Watch_{posName}");
+                if (btnTransform == null) continue;
+
+                TextMeshProUGUI label = btnTransform.GetComponentInChildren<TextMeshProUGUI>();
+                if (label == null) continue;
+
+                if (GameManager.Instance != null &&
+                    System.Enum.TryParse<PlayerPosition>(posName, out PlayerPosition pos))
+                {
+                    Player player = GameManager.Instance.GetPlayerAtPosition(pos);
+                    if (player != null && !string.IsNullOrEmpty(player.PlayerName))
+                    {
+                        label.text = $"{player.PlayerName}\n<size=16>({posName})</size>";
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Spectator selected a player to watch.
+        /// </summary>
+        private void OnSpectatorSelectPlayer(string positionName)
+        {
+            if (!System.Enum.TryParse<PlayerPosition>(positionName, out PlayerPosition pos))
+                return;
+
+            spectatorWatchPosition = pos;
+            if (NetworkGameSync.Instance != null)
+                NetworkGameSync.Instance.SpectatorWatchPosition = pos;
+
+            // Hide overlay, show switch button
+            spectatorOverlay.SetActive(false);
+            spectatorSwitchButton.SetActive(true);
+
+            // Get player name
+            string playerName = positionName;
+            if (GameManager.Instance != null)
+            {
+                Player player = GameManager.Instance.GetPlayerAtPosition(pos);
+                if (player != null && !string.IsNullOrEmpty(player.PlayerName))
+                    playerName = player.PlayerName;
+            }
+
+            if (instructionText != null)
+                instructionText.text = $"Watching {playerName}'s hand";
+
+            Debug.Log($"[GameUI] Spectator now watching: {positionName} ({playerName})");
+
+            // Display the watched player's hand if we have it
+            DisplaySpectatorWatchedHand();
+        }
+
+        /// <summary>
+        /// Show the spectator player selection overlay (for switching).
+        /// </summary>
+        private void ShowSpectatorOverlay()
+        {
+            UpdateSpectatorOverlayNames();
+            spectatorOverlay.SetActive(true);
+            spectatorOverlay.transform.SetAsLastSibling();
+        }
+
+        /// <summary>
+        /// Called when spectator receives a hand for any position from the network.
+        /// </summary>
+        private void OnSpectatorHandReceived(string position, List<Card> cards)
+        {
+            // Only display if this is the position we're watching
+            if (spectatorWatchPosition.HasValue && position == spectatorWatchPosition.Value.ToString())
+            {
+                DisplaySpectatorWatchedHand();
+            }
+        }
+
+        /// <summary>
+        /// Display the watched player's hand cards (read-only, no interaction).
+        /// </summary>
+        private void DisplaySpectatorWatchedHand()
+        {
+            ClearPlayerHand();
+
+            if (!spectatorWatchPosition.HasValue || NetworkGameSync.Instance == null)
+                return;
+
+            string posStr = spectatorWatchPosition.Value.ToString();
+            List<Card> cards = NetworkGameSync.Instance.GetSpectatorHand(posStr);
+
+            if (cards == null || cards.Count == 0)
+            {
+                Debug.Log($"[GameUI] Spectator: no cards for {posStr} yet");
+                return;
+            }
+
+            // Sort cards
+            List<Card> sortedHand = new List<Card>(cards);
+            sortedHand.Sort((a, b) => a.GetSortValue().CompareTo(b.GetSortValue()));
+
+            float totalWidth = (sortedHand.Count - 1) * cardSpacing + cardWidth;
+            float startX = -totalWidth / 2 + cardWidth / 2;
+
+            for (int i = 0; i < sortedHand.Count; i++)
+            {
+                CardUI cardUI = CreateCardUI(sortedHand[i], playerHandContainer);
+                RectTransform cardRect = cardUI.GetComponent<RectTransform>();
+                cardRect.anchoredPosition = new Vector2(startX + i * cardSpacing, 0);
+                cardUI.SetPlayable(false); // Read-only, no interaction
+                playerHandCards.Add(cardUI);
+            }
+
+            Debug.Log($"[GameUI] Spectator: displayed {sortedHand.Count} cards for {posStr}");
         }
 
         /// <summary>
@@ -1718,6 +2000,13 @@ namespace Lekha.UI
                     NetworkGameSync.Instance.OnBotReplacedUI += OnBotReplacedUI;
                     NetworkGameSync.Instance.OnTurnUpdate += OnServerTurnUpdate;
                     NetworkGameSync.Instance.OnTurnTimeout += OnServerTurnTimeout;
+                    NetworkGameSync.Instance.OnSpectatorHandReceived += OnSpectatorHandReceived;
+                }
+
+                // If spectating, show the player selection overlay
+                if (IsSpectating && spectatorOverlay != null)
+                {
+                    spectatorOverlay.SetActive(true);
                 }
 
                 // Subscribe to emoji reactions from other players
@@ -1995,15 +2284,29 @@ namespace Lekha.UI
                 panel?.ClearSpecialCards();
             }
 
-            // Spectators don't see any hand cards
+            // Spectators see the watched player's hand
             if (IsSpectating)
             {
-                Debug.Log("[OnCardsDealt] Spectator mode - skipping hand display");
+                Debug.Log("[OnCardsDealt] Spectator mode - displaying watched hand");
                 isAnimating = false;
                 DisplayOtherPlayersCardCount();
                 UpdateRoundText();
-                if (instructionText != null)
-                    instructionText.text = "Spectating...";
+                UpdateSpectatorOverlayNames();
+                if (spectatorWatchPosition.HasValue)
+                {
+                    DisplaySpectatorWatchedHand();
+                    Player watchedPlayer = GameManager.Instance.GetPlayerAtPosition(spectatorWatchPosition.Value);
+                    string name = watchedPlayer?.PlayerName ?? spectatorWatchPosition.Value.ToString();
+                    if (instructionText != null)
+                        instructionText.text = $"Watching {name}'s hand";
+                }
+                else
+                {
+                    if (instructionText != null)
+                        instructionText.text = "Spectating...";
+                    // Show overlay so spectator can pick a player
+                    ShowSpectatorOverlay();
+                }
                 return;
             }
 
@@ -2024,11 +2327,11 @@ namespace Lekha.UI
 
         private void DisplayPlayerHandAnimatedWithCallback(System.Action onComplete)
         {
-            // Spectators never see hand cards
+            // Spectators see the watched player's hand (no animation)
             if (IsSpectating)
             {
-                Debug.Log("[DisplayPlayerHandAnimated] Spectator mode - skipping hand display");
-                ClearPlayerHand();
+                Debug.Log("[DisplayPlayerHandAnimated] Spectator mode - showing watched hand");
+                DisplaySpectatorWatchedHand();
                 onComplete?.Invoke();
                 return;
             }
@@ -2333,7 +2636,6 @@ namespace Lekha.UI
                         selectedForPass.Add(cardUI);
                         cardUI.SetSelected(true);
                         SoundManager.Instance?.PlayCardSelect();
-                        HapticManager.Instance?.LightTap();
                         // Refresh which cards are passable now
                         UpdatePassableCards();
                     }
@@ -2427,9 +2729,8 @@ namespace Lekha.UI
             // Cancel any pending AI play immediately
             CancelPendingAIPlay();
 
-            // Play sound and haptic
+            // Play sound
             SoundManager.Instance?.PlayCardPlay();
-            HapticManager.Instance?.MediumTap();
 
             // Check for special cards and play dramatic effect
             Debug.Log($"[OnCardPlayed] Checking special cards: {card.Suit} {card.Rank}, IsQueenOfSpades={card.IsQueenOfSpades()}, SpecialCardEffect.Instance={SpecialCardEffect.Instance != null}");
@@ -2824,9 +3125,8 @@ namespace Lekha.UI
 
             Debug.Log($"[OnTrickWon] {winner.PlayerName} wins. TrickCards count: {trickCards.Count}. Lock set for {TRICK_COMPLETE_COOLDOWN}s");
 
-            // Play sound and haptic
+            // Play sound
             SoundManager.Instance?.PlayTrickWin();
-            HapticManager.Instance?.HeavyTap();
 
             // Highlight the winner's panel
             HighlightTrickWinner(winner.Position);
@@ -2981,7 +3281,16 @@ namespace Lekha.UI
                     // Spectators can't participate in pass phase
                     isPassPhase = false;
                     passButton.gameObject.SetActive(false);
-                    instructionText.text = "Spectating - players passing cards...";
+                    if (spectatorWatchPosition.HasValue)
+                    {
+                        Player watched = GameManager.Instance.GetPlayerAtPosition(spectatorWatchPosition.Value);
+                        string name = watched?.PlayerName ?? spectatorWatchPosition.Value.ToString();
+                        instructionText.text = $"Watching {name}'s hand - players passing cards...";
+                    }
+                    else
+                    {
+                        instructionText.text = "Spectating - players passing cards...";
+                    }
                 }
                 else
                 {
@@ -3010,15 +3319,25 @@ namespace Lekha.UI
             Debug.Log("[OnPassPhaseComplete] Pass phase completed, refreshing hand display");
             ResetWatchdogTimer();
 
-            // Spectators don't have hand cards to refresh
+            // Spectators see the watched player's updated hand after pass
             if (IsSpectating)
             {
-                Debug.Log("[OnPassPhaseComplete] Spectator mode - skipping hand display");
+                Debug.Log("[OnPassPhaseComplete] Spectator mode - refreshing watched hand");
                 isAnimating = false;
                 isPassPhase = false;
                 selectedForPass.Clear();
-                if (instructionText != null)
+                DisplaySpectatorWatchedHand();
+                if (spectatorWatchPosition.HasValue)
+                {
+                    Player watchedPlayer = GameManager.Instance.GetPlayerAtPosition(spectatorWatchPosition.Value);
+                    string name = watchedPlayer?.PlayerName ?? spectatorWatchPosition.Value.ToString();
+                    if (instructionText != null)
+                        instructionText.text = $"Watching {name}'s hand";
+                }
+                else if (instructionText != null)
+                {
                     instructionText.text = "Spectating...";
+                }
                 return;
             }
 
@@ -3085,8 +3404,7 @@ namespace Lekha.UI
             if (IsSpectating)
             {
                 Debug.Log("[StartTurnAfterDelay] Spectator mode - just watching");
-                if (instructionText != null)
-                    instructionText.text = $"Spectating - {currentPlayer.PlayerName}'s turn";
+                UpdateInstructionText();
                 yield break;
             }
 
@@ -3156,7 +3474,6 @@ namespace Lekha.UI
         private void OnRoundEnded(Player[] players)
         {
             SoundManager.Instance?.PlayRoundEnd();
-            HapticManager.Instance?.MediumTap();
             UpdateScoreText();
             instructionText.text = "Round ended! Starting next round...";
 
@@ -3231,13 +3548,11 @@ namespace Lekha.UI
             if (localPlayerWon)
             {
                 SoundManager.Instance?.PlayGameWin();
-                HapticManager.Instance?.SuccessTap();
                 instructionText.text = "Game Over! You WIN!";
             }
             else
             {
                 SoundManager.Instance?.PlayGameLose();
-                HapticManager.Instance?.ErrorTap();
                 instructionText.text = "Game Over! You LOSE!";
             }
 
@@ -3340,7 +3655,16 @@ namespace Lekha.UI
                 Player current = GameManager.Instance.CurrentPlayer;
                 if (IsSpectating)
                 {
-                    instructionText.text = $"Spectating - {current.PlayerName}'s turn";
+                    if (spectatorWatchPosition.HasValue)
+                    {
+                        Player watched = GameManager.Instance.GetPlayerAtPosition(spectatorWatchPosition.Value);
+                        string watchName = watched?.PlayerName ?? spectatorWatchPosition.Value.ToString();
+                        instructionText.text = $"Watching {watchName}'s hand - {current.PlayerName}'s turn";
+                    }
+                    else
+                    {
+                        instructionText.text = $"Spectating - {current.PlayerName}'s turn";
+                    }
                 }
                 else if (GameManager.Instance.IsLocalPlayerTurn())
                 {
@@ -3357,7 +3681,16 @@ namespace Lekha.UI
             }
             else if (IsSpectating)
             {
-                instructionText.text = "Spectating...";
+                if (spectatorWatchPosition.HasValue)
+                {
+                    Player watched = GameManager.Instance.GetPlayerAtPosition(spectatorWatchPosition.Value);
+                    string watchName = watched?.PlayerName ?? spectatorWatchPosition.Value.ToString();
+                    instructionText.text = $"Watching {watchName}'s hand";
+                }
+                else
+                {
+                    instructionText.text = "Spectating...";
+                }
             }
         }
 
@@ -3413,7 +3746,6 @@ namespace Lekha.UI
             if (playerInfoPanels.TryGetValue(position, out PlayerInfoPanel panel))
             {
                 panel.ShowEmoji(emoji);
-                HapticManager.Instance?.LightTap();
             }
         }
 

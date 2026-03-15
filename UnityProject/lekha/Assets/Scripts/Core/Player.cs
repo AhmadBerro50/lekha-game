@@ -80,6 +80,12 @@ namespace Lekha.Core
         /// </summary>
         public void ReceiveCards(List<Card> cards)
         {
+            // Clear hand first to prevent accumulation if called without EndRound
+            if (hand.Count > 0)
+            {
+                Debug.LogWarning($"{PlayerName} ReceiveCards called with {hand.Count} cards still in hand — clearing first!");
+                hand.Clear();
+            }
             hand.AddRange(cards);
             SortHand();
             Debug.Log($"{PlayerName} received {cards.Count} cards. Hand size: {hand.Count}");

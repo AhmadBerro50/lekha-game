@@ -164,6 +164,9 @@ namespace Lekha.Network
         // Pending actions queue
         private Queue<Action> pendingActions = new Queue<Action>();
 
+        // Track last dealt round to prevent duplicate card dealing
+        private int lastDealtRound = -1;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -222,6 +225,26 @@ namespace Lekha.Network
         }
 
         /// <summary>
+        /// True when this client is a spectator (not a player).
+        /// </summary>
+        private bool IsSpectating => NetworkManager.Instance != null && NetworkManager.Instance.IsSpectating;
+
+        /// <summary>
+        /// Spectator: which position the spectator is currently watching.
+        /// </summary>
+        public PlayerPosition? SpectatorWatchPosition { get; set; }
+
+        /// <summary>
+        /// Spectator: cards for each position (received via CardDealt broadcasts).
+        /// </summary>
+        private Dictionary<string, List<Card>> spectatorHands = new Dictionary<string, List<Card>>();
+
+        /// <summary>
+        /// Event fired when spectator receives a hand for any position.
+        /// </summary>
+        public event Action<string, List<Card>> OnSpectatorHandReceived;
+
+        /// <summary>
         /// Initialize for an online game
         /// </summary>
         public void InitializeOnlineGame(string position, bool hosting)
@@ -230,7 +253,7 @@ namespace Lekha.Network
             isHost = hosting;
             localPosition = position;
 
-            Debug.Log($"[NetworkGameSync] Initialized online game - Position: {position}, Host: {hosting}");
+            Debug.Log($"[NetworkGameSync] Initialized online game - Position: {position}, Host: {hosting}, Spectating: {IsSpectating}");
         }
 
         /// <summary>
@@ -255,6 +278,20 @@ namespace Lekha.Network
 
             if (room != null && localPlayer != null)
             {
+                // Spectators should NOT initialize as a player
+                if (IsSpectating)
+                {
+                    isOnlineGame = true;
+                    isHost = false;
+                    localPosition = null; // No position — spectator is not a player
+                    spectatorHands.Clear();
+                    Debug.Log("[NetworkGameSync] Spectator joined game — not initializing as player");
+
+                    // Set player names so UI can display them
+                    SetNetworkPlayerNamesInGameManager(room);
+                    return;
+                }
+
                 string position = localPlayer.AssignedPosition?.ToString() ?? PlayerPosition.South.ToString();
                 InitializeOnlineGame(position, localPlayer.IsHost);
 
@@ -364,7 +401,7 @@ namespace Lekha.Network
         /// </summary>
         public void SendPassCards(PlayerPosition from, PlayerPosition to, List<Card> cards)
         {
-            if (!isOnlineGame) return;
+            if (!isOnlineGame || IsSpectating) return;
 
             var passData = new PassCardsData
             {
@@ -388,7 +425,7 @@ namespace Lekha.Network
         /// </summary>
         public void SendCardPlayed(PlayerPosition position, Card card, int trickIndex)
         {
-            if (!isOnlineGame) return;
+            if (!isOnlineGame || IsSpectating) return;
 
             var playData = new CardPlayedData
             {
@@ -485,11 +522,43 @@ namespace Lekha.Network
                 // Parse position and hand
                 var parsed = JsonUtility.FromJson<DealtDataWrapper>(message.Data);
 
-                Debug.Log($"[NetworkGameSync] Received CardDealt for position: {parsed.Position}, local position: {localPosition}, starting: {parsed.StartingPosition}, round: {parsed.RoundNumber}");
+                Debug.Log($"[NetworkGameSync] Received CardDealt for position: {parsed.Position}, local position: {localPosition}, spectating: {IsSpectating}, starting: {parsed.StartingPosition}, round: {parsed.RoundNumber}");
+
+                // SPECTATOR: store cards for display but do NOT touch game state
+                if (IsSpectating)
+                {
+                    pendingActions.Enqueue(() => {
+                        var cards = parsed.Hand.ToCardList();
+                        spectatorHands[parsed.Position] = cards;
+                        Debug.Log($"[NetworkGameSync] Spectator stored {cards.Count} cards for {parsed.Position}");
+
+                        // Set starting position / round so UI can track progress
+                        if (GameLogic.GameManager.Instance != null)
+                        {
+                            if (!string.IsNullOrEmpty(parsed.StartingPosition) &&
+                                System.Enum.TryParse<PlayerPosition>(parsed.StartingPosition, out PlayerPosition startPos))
+                            {
+                                GameLogic.GameManager.Instance.SetStartingPlayer(startPos, parsed.RoundNumber);
+                            }
+                            GameLogic.GameManager.Instance.NotifyCardsDealt();
+                        }
+
+                        OnSpectatorHandReceived?.Invoke(parsed.Position, cards);
+                    });
+                    return;
+                }
 
                 // Only process if this is for local player's position
                 if (parsed.Position == localPosition)
                 {
+                    // Guard: prevent processing duplicate CardDealt for the same round
+                    if (parsed.RoundNumber > 0 && parsed.RoundNumber == lastDealtRound)
+                    {
+                        Debug.LogWarning($"[NetworkGameSync] Ignoring duplicate CardDealt for round {parsed.RoundNumber}");
+                        return;
+                    }
+                    lastDealtRound = parsed.RoundNumber;
+
                     pendingActions.Enqueue(() => {
                         // Convert network hand data to actual cards and give to player
                         var cards = parsed.Hand.ToCardList();
@@ -505,7 +574,7 @@ namespace Lekha.Network
                                 if (player != null)
                                 {
                                     player.ReceiveCards(cards);
-                                    Debug.Log($"[NetworkGameSync] Cards applied to player at {pos}");
+                                    Debug.Log($"[NetworkGameSync] Cards applied to player at {pos} (hand: {player.Hand.Count})");
 
                                     // Set starting position if provided
                                     if (!string.IsNullOrEmpty(parsed.StartingPosition) &&
@@ -540,6 +609,9 @@ namespace Lekha.Network
 
         private void HandlePassCards(NetworkMessage message)
         {
+            // Spectators do not participate in pass phase
+            if (IsSpectating) return;
+
             try
             {
                 var passData = JsonUtility.FromJson<PassCardsData>(message.Data);
@@ -563,6 +635,28 @@ namespace Lekha.Network
             try
             {
                 var playData = JsonUtility.FromJson<CardPlayedData>(message.Data);
+
+                // Spectators see ALL card plays (they have no "own" plays to skip)
+                if (IsSpectating)
+                {
+                    pendingActions.Enqueue(() => {
+                        // Remove card from spectator's stored hand for the playing position
+                        if (spectatorHands.ContainsKey(playData.Position))
+                        {
+                            var card = playData.Card.ToCard();
+                            spectatorHands[playData.Position].RemoveAll(c => c.Equals(card));
+                        }
+                        OnCardPlayedReceived?.Invoke(playData);
+
+                        // Notify UI to refresh watched hand after a card is played
+                        if (SpectatorWatchPosition.HasValue && playData.Position == SpectatorWatchPosition.Value.ToString())
+                        {
+                            OnSpectatorHandReceived?.Invoke(playData.Position,
+                                spectatorHands.ContainsKey(playData.Position) ? spectatorHands[playData.Position] : new List<Card>());
+                        }
+                    });
+                    return;
+                }
 
                 // Don't process our own plays (we already know about them)
                 if (playData.Position != localPosition)
@@ -765,7 +859,7 @@ namespace Lekha.Network
         /// </summary>
         public void TriggerAIIfNeeded()
         {
-            if (!isOnlineGame || !isHost) return;
+            if (!isOnlineGame || !isHost || IsSpectating) return;
             if (GameManager.Instance == null) return;
 
             PlayerPosition currentPos = GameManager.Instance.CurrentPlayer.Position;
@@ -824,6 +918,16 @@ namespace Lekha.Network
         }
 
         /// <summary>
+        /// Get stored hand for a position (spectator mode).
+        /// </summary>
+        public List<Card> GetSpectatorHand(string position)
+        {
+            if (spectatorHands.ContainsKey(position))
+                return new List<Card>(spectatorHands[position]);
+            return new List<Card>();
+        }
+
+        /// <summary>
         /// Reset for new game
         /// </summary>
         public void Reset()
@@ -834,6 +938,9 @@ namespace Lekha.Network
             currentNetworkState = null;
             autoPassSubmitted.Clear();
             pendingActions.Clear();
+            lastDealtRound = -1;
+            spectatorHands.Clear();
+            SpectatorWatchPosition = null;
 
             // Hide ping display when leaving online game
             if (PingDisplay.Instance != null)

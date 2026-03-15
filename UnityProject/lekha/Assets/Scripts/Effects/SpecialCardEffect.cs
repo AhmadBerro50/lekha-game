@@ -88,10 +88,9 @@ namespace Lekha.Effects
 
             isAnimating = true;
 
-            // Play breaking sound and haptic
+            // Play breaking sound
             Debug.Log("[SpecialCardEffect] Playing impact sound...");
             SoundManager.Instance?.PlaySpecialCardImpact(intense);
-            HapticManager.Instance?.HeavyTap();
 
             // Create effect container
             GameObject effectObj = new GameObject("ImpactEffect");

@@ -261,8 +261,16 @@ namespace Lekha.GameLogic
         /// <summary>
         /// Apply received pass cards to local player's hand and complete pass phase
         /// </summary>
+        private bool passCardsApplied = false; // Guard against double-application
         private void ApplyReceivedPassCards(Network.PassCardsData passData)
         {
+            // Guard: prevent applying pass cards more than once per round
+            if (passCardsApplied)
+            {
+                Debug.LogWarning($"[GameManager] ApplyReceivedPassCards called again — already applied this round, ignoring");
+                return;
+            }
+
             if (System.Enum.TryParse<PlayerPosition>(passData.ToPosition, out PlayerPosition toPos))
             {
                 Player recipient = GetPlayerAtPosition(toPos);
@@ -272,9 +280,10 @@ namespace Lekha.GameLogic
                     cards.Add(cardData.ToCard());
                 }
                 recipient.AddPassedCards(cards);
+                passCardsApplied = true;
 
                 receivedPassFrom.Add(passData.FromPosition);
-                Debug.Log($"[GameManager] Local player received {cards.Count} cards from {passData.FromPosition}");
+                Debug.Log($"[GameManager] Local player received {cards.Count} cards from {passData.FromPosition} (hand now {recipient.Hand.Count})");
 
                 // Notify UI to show received cards with "P" badge
                 if (System.Enum.TryParse<PlayerPosition>(passData.FromPosition, out PlayerPosition fromPos))
@@ -292,8 +301,17 @@ namespace Lekha.GameLogic
         /// <summary>
         /// Complete pass phase for online games
         /// </summary>
+        private bool onlinePassPhaseCompleted = false; // Guard against double-completion
         private void CompleteOnlinePassPhase()
         {
+            // Guard: prevent completing pass phase more than once per round
+            if (onlinePassPhaseCompleted)
+            {
+                Debug.LogWarning("[GameManager] CompleteOnlinePassPhase called again — already completed, ignoring");
+                return;
+            }
+            onlinePassPhaseCompleted = true;
+
             Debug.Log("[GameManager] Online pass phase complete");
             CancelPassPhaseTimeout();
             receivedPassFrom.Clear();
@@ -461,6 +479,8 @@ namespace Lekha.GameLogic
             localPassSubmitted = false;
             bufferedPassCards = null;
             receivedPassFrom.Clear();
+            passCardsApplied = false;
+            onlinePassPhaseCompleted = false;
 
             // Reset round state for non-host clients (host resets these in StartNewRound)
             tricksPlayedThisRound = 0;
@@ -500,6 +520,8 @@ namespace Lekha.GameLogic
             localPassSubmitted = false;
             bufferedPassCards = null;
             receivedPassFrom.Clear();
+            passCardsApplied = false;
+            onlinePassPhaseCompleted = false;
 
             Debug.Log($"=== ROUND {roundNumber} ===");
 
