@@ -32,13 +32,16 @@ namespace Lekha.UI
         private TMP_InputField inputField;
         private Button sendButton;
 
+        // Backdrop for tap-outside-to-close
+        private GameObject backdrop;
+
         // Animation
         private bool isAnimating = false;
         private float animationProgress = 0f;
         private bool animatingOpen = false;
         private const float ANIMATION_SPEED = 6f;
-        private const float PANEL_WIDTH = 350f;
-        private const float PANEL_HEIGHT = 420f;
+        private const float PANEL_WIDTH = 700f;
+        private const float PANEL_HEIGHT = 500f;
 
         // Colors
         private static readonly Color PanelBg = new Color(0.04f, 0.06f, 0.12f, 0.94f);
@@ -95,18 +98,20 @@ namespace Lekha.UI
                 }
 
                 float t = EaseOutCubic(animationProgress);
+                CanvasGroup panelCG = chatPanel.GetComponent<CanvasGroup>();
                 if (animatingOpen)
                 {
-                    // Slide in from right
-                    chatPanelRect.anchoredPosition = new Vector2(Mathf.Lerp(PANEL_WIDTH, 0, t), chatPanelRect.anchoredPosition.y);
+                    if (panelCG != null) panelCG.alpha = t;
+                    chatPanel.transform.localScale = Vector3.one * Mathf.Lerp(0.92f, 1f, t);
                 }
                 else
                 {
-                    // Slide out to right
-                    chatPanelRect.anchoredPosition = new Vector2(Mathf.Lerp(0, PANEL_WIDTH, t), chatPanelRect.anchoredPosition.y);
+                    if (panelCG != null) panelCG.alpha = 1f - t;
+                    chatPanel.transform.localScale = Vector3.one * Mathf.Lerp(1f, 0.92f, t);
                     if (!isAnimating)
                     {
                         chatPanel.SetActive(false);
+                        if (backdrop != null) backdrop.SetActive(false);
                     }
                 }
             }
@@ -215,7 +220,11 @@ namespace Lekha.UI
         private void OpenPanel()
         {
             isPanelOpen = true;
+            if (backdrop != null) backdrop.SetActive(true);
             chatPanel.SetActive(true);
+            CanvasGroup cg = chatPanel.GetComponent<CanvasGroup>();
+            if (cg != null) cg.alpha = 0f;
+            chatPanel.transform.localScale = Vector3.one * 0.92f;
             isAnimating = true;
             animationProgress = 0f;
             animatingOpen = true;
@@ -265,6 +274,7 @@ namespace Lekha.UI
             {
                 isPanelOpen = false;
                 chatPanel.SetActive(false);
+                if (backdrop != null) backdrop.SetActive(false);
             }
 
             if (chatButton != null) chatButton.SetActive(false);
@@ -276,6 +286,7 @@ namespace Lekha.UI
             {
                 isPanelOpen = false;
                 chatPanel.SetActive(false);
+                if (backdrop != null) backdrop.SetActive(false);
             }
             if (chatButton != null) chatButton.SetActive(false);
         }
@@ -291,7 +302,7 @@ namespace Lekha.UI
 
             CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080, 1920);
+            scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
 
             gameObject.AddComponent<GraphicRaycaster>();
@@ -331,16 +342,16 @@ namespace Lekha.UI
             chatButton.transform.SetParent(transform, false);
 
             RectTransform btnRect = chatButton.AddComponent<RectTransform>();
-            btnRect.anchorMin = new Vector2(1, 0);
-            btnRect.anchorMax = new Vector2(1, 0);
-            btnRect.pivot = new Vector2(1, 0);
-            // Bottom-right, above where emoji button typically is
-            btnRect.anchoredPosition = new Vector2(-20, 160);
-            btnRect.sizeDelta = new Vector2(56, 56);
+            // Bottom center
+            btnRect.anchorMin = new Vector2(0.5f, 0);
+            btnRect.anchorMax = new Vector2(0.5f, 0);
+            btnRect.pivot = new Vector2(0.5f, 0);
+            btnRect.anchoredPosition = new Vector2(0, 16);
+            btnRect.sizeDelta = new Vector2(110, 40);
 
             Image btnBg = chatButton.AddComponent<Image>();
-            btnBg.sprite = GetCircleSprite();
-            btnBg.color = new Color(0.20f, 0.25f, 0.45f, 0.95f);
+            btnBg.sprite = GetPillSprite();
+            btnBg.color = new Color(0.12f, 0.16f, 0.30f, 0.92f);
 
             Button btn = chatButton.AddComponent<Button>();
             btn.targetGraphic = btnBg;
@@ -353,25 +364,29 @@ namespace Lekha.UI
             cb.selectedColor = Color.white;
             btn.colors = cb;
 
-            // Shadow
             Shadow shadow = chatButton.AddComponent<Shadow>();
             shadow.effectColor = new Color(0, 0, 0, 0.4f);
-            shadow.effectDistance = new Vector2(2, -2);
+            shadow.effectDistance = new Vector2(0, -2);
 
-            // Icon text
-            GameObject iconObj = new GameObject("Icon");
-            iconObj.transform.SetParent(chatButton.transform, false);
-            RectTransform iconRect = iconObj.AddComponent<RectTransform>();
-            iconRect.anchorMin = Vector2.zero;
-            iconRect.anchorMax = Vector2.one;
-            iconRect.sizeDelta = Vector2.zero;
+            Outline outline = chatButton.AddComponent<Outline>();
+            outline.effectColor = new Color(0.35f, 0.55f, 0.95f, 0.3f);
+            outline.effectDistance = new Vector2(1, -1);
 
-            TextMeshProUGUI iconTmp = iconObj.AddComponent<TextMeshProUGUI>();
-            iconTmp.text = "\u2709"; // Envelope icon
-            iconTmp.fontSize = 24;
-            iconTmp.alignment = TextAlignmentOptions.Center;
-            iconTmp.color = new Color(0.40f, 0.75f, 1f, 1f);
-            iconTmp.raycastTarget = false;
+            // "CHAT" label with envelope icon
+            GameObject labelObj = new GameObject("Label");
+            labelObj.transform.SetParent(chatButton.transform, false);
+            RectTransform labelRect = labelObj.AddComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.sizeDelta = Vector2.zero;
+
+            TextMeshProUGUI labelTmp = labelObj.AddComponent<TextMeshProUGUI>();
+            labelTmp.text = "\u2709  CHAT";
+            labelTmp.fontSize = 16;
+            labelTmp.fontStyle = FontStyles.Bold;
+            labelTmp.alignment = TextAlignmentOptions.Center;
+            labelTmp.color = new Color(0.55f, 0.80f, 1f, 1f);
+            labelTmp.raycastTarget = false;
 
             // Unread badge
             unreadBadge = new GameObject("UnreadBadge");
@@ -408,24 +423,56 @@ namespace Lekha.UI
 
         private void CreateChatPanel()
         {
+            // Backdrop: semi-transparent overlay, tap to close
+            backdrop = new GameObject("ChatBackdrop");
+            backdrop.transform.SetParent(transform, false);
+            RectTransform bdRect = backdrop.AddComponent<RectTransform>();
+            bdRect.anchorMin = Vector2.zero;
+            bdRect.anchorMax = Vector2.one;
+            bdRect.sizeDelta = Vector2.zero;
+
+            Image bdImg = backdrop.AddComponent<Image>();
+            bdImg.color = new Color(0f, 0f, 0f, 0.45f);
+
+            Button bdBtn = backdrop.AddComponent<Button>();
+            bdBtn.targetGraphic = bdImg;
+            bdBtn.onClick.AddListener(ClosePanel);
+            ColorBlock bdCb = bdBtn.colors;
+            bdCb.normalColor = Color.white;
+            bdCb.highlightedColor = Color.white;
+            bdCb.pressedColor = Color.white;
+            bdCb.selectedColor = Color.white;
+            bdBtn.colors = bdCb;
+
+            backdrop.SetActive(false);
+
+            // Chat panel: centered on screen
             chatPanel = new GameObject("ChatPanel");
             chatPanel.transform.SetParent(transform, false);
 
             chatPanelRect = chatPanel.AddComponent<RectTransform>();
-            chatPanelRect.anchorMin = new Vector2(1, 0);
-            chatPanelRect.anchorMax = new Vector2(1, 0);
-            chatPanelRect.pivot = new Vector2(1, 0);
-            chatPanelRect.anchoredPosition = new Vector2(0, 80);
+            chatPanelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            chatPanelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            chatPanelRect.pivot = new Vector2(0.5f, 0.5f);
+            chatPanelRect.anchoredPosition = Vector2.zero;
             chatPanelRect.sizeDelta = new Vector2(PANEL_WIDTH, PANEL_HEIGHT);
+
+            // CanvasGroup for fade animation
+            CanvasGroup panelCG = chatPanel.AddComponent<CanvasGroup>();
+            panelCG.alpha = 0f;
 
             Image panelBg = chatPanel.AddComponent<Image>();
             panelBg.sprite = GetRoundedSprite();
             panelBg.color = PanelBg;
 
-            // Add outline border
+            // Outline border
             Outline panelOutline = chatPanel.AddComponent<Outline>();
             panelOutline.effectColor = new Color(1f, 1f, 1f, 0.10f);
             panelOutline.effectDistance = new Vector2(1, -1);
+
+            Shadow panelShadow = chatPanel.AddComponent<Shadow>();
+            panelShadow.effectColor = new Color(0f, 0f, 0f, 0.5f);
+            panelShadow.effectDistance = new Vector2(0, -4);
 
             // Layout: Header, Messages, Input
             VerticalLayoutGroup vlg = chatPanel.AddComponent<VerticalLayoutGroup>();
@@ -480,16 +527,22 @@ namespace Lekha.UI
             closeRect.anchorMin = new Vector2(1, 0.5f);
             closeRect.anchorMax = new Vector2(1, 0.5f);
             closeRect.pivot = new Vector2(1, 0.5f);
-            closeRect.anchoredPosition = new Vector2(-6, 0);
-            closeRect.sizeDelta = new Vector2(34, 34);
+            closeRect.anchoredPosition = new Vector2(-8, 0);
+            closeRect.sizeDelta = new Vector2(40, 40);
 
             Image closeBg = closeObj.AddComponent<Image>();
             closeBg.sprite = GetCircleSprite();
-            closeBg.color = new Color(1f, 1f, 1f, 0.06f);
+            closeBg.color = new Color(0.95f, 0.30f, 0.35f, 0.85f);
 
             Button closeBtn = closeObj.AddComponent<Button>();
             closeBtn.targetGraphic = closeBg;
             closeBtn.onClick.AddListener(ClosePanel);
+
+            ColorBlock closeCb = closeBtn.colors;
+            closeCb.normalColor = Color.white;
+            closeCb.highlightedColor = new Color(1.1f, 1.1f, 1.1f, 1f);
+            closeCb.pressedColor = new Color(0.80f, 0.80f, 0.80f, 1f);
+            closeBtn.colors = closeCb;
 
             GameObject closeIcon = new GameObject("X");
             closeIcon.transform.SetParent(closeObj.transform, false);
@@ -500,9 +553,10 @@ namespace Lekha.UI
 
             TextMeshProUGUI closeTmp = closeIcon.AddComponent<TextMeshProUGUI>();
             closeTmp.text = "\u2715";
-            closeTmp.fontSize = 16;
+            closeTmp.fontSize = 20;
+            closeTmp.fontStyle = FontStyles.Bold;
             closeTmp.alignment = TextAlignmentOptions.Center;
-            closeTmp.color = TextMuted;
+            closeTmp.color = Color.white;
             closeTmp.raycastTarget = false;
         }
 
@@ -623,9 +677,10 @@ namespace Lekha.UI
             inputTextRect.offsetMax = Vector2.zero;
 
             TextMeshProUGUI inputTmp = inputTextObj.AddComponent<TextMeshProUGUI>();
-            inputTmp.fontSize = 14;
+            inputTmp.fontSize = 16;
             inputTmp.color = TextWhite;
             inputTmp.alignment = TextAlignmentOptions.MidlineLeft;
+            inputTmp.isRightToLeftText = false; // Will auto-handle mixed text
 
             inputField.textComponent = inputTmp;
             inputField.textViewport = textAreaRect;
@@ -764,11 +819,26 @@ namespace Lekha.UI
 
             TextMeshProUGUI textTmp = textObj.AddComponent<TextMeshProUGUI>();
             textTmp.text = entry.Text;
-            textTmp.fontSize = 14;
+            textTmp.fontSize = 16;
             textTmp.color = TextWhite;
-            textTmp.alignment = entry.IsLocal ? TextAlignmentOptions.TopRight : TextAlignmentOptions.TopLeft;
             textTmp.enableWordWrapping = true;
             textTmp.raycastTarget = false;
+
+            // Arabic / RTL support: detect if text contains Arabic chars
+            bool hasArabic = false;
+            foreach (char c in entry.Text)
+            {
+                if (c >= 0x0600 && c <= 0x06FF) { hasArabic = true; break; }
+            }
+            if (hasArabic)
+            {
+                textTmp.isRightToLeftText = true;
+                textTmp.alignment = TextAlignmentOptions.TopRight;
+            }
+            else
+            {
+                textTmp.alignment = entry.IsLocal ? TextAlignmentOptions.TopRight : TextAlignmentOptions.TopLeft;
+            }
 
             // Timestamp
             GameObject tsObj = new GameObject("Timestamp");

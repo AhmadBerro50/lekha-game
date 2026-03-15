@@ -482,8 +482,9 @@ namespace Lekha.UI
             // Create emoji panel directly in GameUI (no separate component - avoids destruction issues)
             CreateEmojiPanel(canvasTransform);
 
-            // Create info button (top-left, available for all players)
+            // Create info button (top-left, spectators only)
             infoButton = CreateInfoButton(canvasTransform);
+            if (infoButton != null) infoButton.gameObject.SetActive(IsSpectating);
 
             // Create spectator UI elements (hidden until spectating)
             CreateSpectatorUI(canvasTransform);
