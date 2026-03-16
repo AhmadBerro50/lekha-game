@@ -1041,7 +1041,7 @@ namespace Lekha.UI
                     panelRect.anchorMin = new Vector2(0.5f, 0);
                     panelRect.anchorMax = new Vector2(0.5f, 0);
                     panelRect.pivot = new Vector2(0.5f, 0);
-                    panelRect.anchoredPosition = new Vector2(0, 185); // Above hand cards with ~10px padding
+                    panelRect.anchoredPosition = new Vector2(0, 220); // Above hand cards — bottom of panel sits on top of cards
                     break;
 
                 case PlayerPosition.West: // Left side - above card backs (moved right to avoid camera notch)

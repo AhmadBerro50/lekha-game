@@ -512,7 +512,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI titleTmp = titleObj.AddComponent<TextMeshProUGUI>();
             titleTmp.text = "CHAT";
-            titleTmp.fontSize = 16;
+            titleTmp.fontSize = 22;
             titleTmp.fontStyle = FontStyles.Bold;
             titleTmp.alignment = TextAlignmentOptions.MidlineLeft;
             titleTmp.color = new Color(0.40f, 0.75f, 1f, 1f);
@@ -677,7 +677,7 @@ namespace Lekha.UI
             inputTextRect.offsetMax = Vector2.zero;
 
             TextMeshProUGUI inputTmp = inputTextObj.AddComponent<TextMeshProUGUI>();
-            inputTmp.fontSize = 16;
+            inputTmp.fontSize = 18;
             inputTmp.color = TextWhite;
             inputTmp.alignment = TextAlignmentOptions.MidlineLeft;
             inputTmp.isRightToLeftText = false; // Will auto-handle mixed text
@@ -696,7 +696,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI placeholderTmp = placeholderObj.AddComponent<TextMeshProUGUI>();
             placeholderTmp.text = "Type a message...";
-            placeholderTmp.fontSize = 14;
+            placeholderTmp.fontSize = 18;
             placeholderTmp.fontStyle = FontStyles.Italic;
             placeholderTmp.color = TextMuted;
             placeholderTmp.alignment = TextAlignmentOptions.MidlineLeft;
@@ -735,7 +735,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI sendTmp = sendTextObj.AddComponent<TextMeshProUGUI>();
             sendTmp.text = "Send";
-            sendTmp.fontSize = 14;
+            sendTmp.fontSize = 18;
             sendTmp.fontStyle = FontStyles.Bold;
             sendTmp.alignment = TextAlignmentOptions.Center;
             sendTmp.color = Color.white;
@@ -806,7 +806,7 @@ namespace Lekha.UI
 
                 TextMeshProUGUI nameTmp = nameObj.AddComponent<TextMeshProUGUI>();
                 nameTmp.text = entry.PlayerName;
-                nameTmp.fontSize = 12;
+                nameTmp.fontSize = 15;
                 nameTmp.fontStyle = FontStyles.Bold;
                 nameTmp.color = GetPositionColor(entry.Position);
                 nameTmp.alignment = TextAlignmentOptions.TopLeft;
@@ -819,7 +819,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI textTmp = textObj.AddComponent<TextMeshProUGUI>();
             textTmp.text = entry.Text;
-            textTmp.fontSize = 16;
+            textTmp.fontSize = 20;
             textTmp.color = TextWhite;
             textTmp.enableWordWrapping = true;
             textTmp.raycastTarget = false;
@@ -847,7 +847,7 @@ namespace Lekha.UI
             TextMeshProUGUI tsTmp = tsObj.AddComponent<TextMeshProUGUI>();
             var dt = System.DateTimeOffset.FromUnixTimeMilliseconds(entry.Timestamp).LocalDateTime;
             tsTmp.text = dt.ToString("HH:mm");
-            tsTmp.fontSize = 10;
+            tsTmp.fontSize = 13;
             tsTmp.color = TextMuted;
             tsTmp.alignment = entry.IsLocal ? TextAlignmentOptions.TopRight : TextAlignmentOptions.TopLeft;
             tsTmp.raycastTarget = false;
