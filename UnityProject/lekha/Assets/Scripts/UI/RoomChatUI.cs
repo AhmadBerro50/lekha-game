@@ -838,7 +838,7 @@ namespace Lekha.UI
             textTmp.text = entry.Text;
             textTmp.fontSize = 36;
             textTmp.color = TextWhite;
-            textTmp.enableWordWrapping = true;
+            textTmp.textWrappingMode = TextWrappingModes.Normal;
             textTmp.raycastTarget = false;
 
             // Arabic / RTL support: detect if text contains Arabic chars

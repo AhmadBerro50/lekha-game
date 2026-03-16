@@ -46,7 +46,7 @@ namespace Lekha.UI
         private const string IconSpkOn   = "SPK";
         private const string IconSpkOff  = "OFF";
 
-        private bool isVisible = false;
+
 
         private void Awake()
         {
@@ -297,7 +297,7 @@ namespace Lekha.UI
         public void Show()
         {
             if (rootPanel != null) rootPanel.SetActive(true);
-            isVisible = true;
+            // visible
             UpdateButtonStates();
             Debug.Log("[InGameVoiceChatUI] Show() called");
         }
@@ -305,7 +305,7 @@ namespace Lekha.UI
         public void Hide()
         {
             if (rootPanel != null) rootPanel.SetActive(false);
-            isVisible = false;
+            // hidden
         }
 
         // ─── Helpers ─────────────────────────────────────────────────────────

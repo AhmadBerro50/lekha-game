@@ -109,8 +109,10 @@ namespace Lekha.Network
                 // Enable volume indication for speaking detection (every 200ms)
                 rtcEngine.EnableAudioVolumeIndication(200, 3, true);
 
-                // Optimize for voice chat
+                // Optimize for voice chat — clear speech with noise suppression
                 rtcEngine.SetAudioProfile(AUDIO_PROFILE_TYPE.AUDIO_PROFILE_SPEECH_STANDARD);
+                rtcEngine.SetParameters("{\"che.audio.enable.ns\":true}");   // Noise suppression
+                rtcEngine.SetParameters("{\"che.audio.enable.agc\":true}");  // Auto gain control
 
                 // Route audio to loudspeaker instead of earpiece
                 rtcEngine.SetDefaultAudioRouteToSpeakerphone(true);
