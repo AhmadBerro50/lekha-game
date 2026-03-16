@@ -616,22 +616,22 @@ namespace Lekha.UI
                 }
             });
 
-            // Score icon
+            // Score icon (sprite from Resources/Icons)
             GameObject iconObj = new GameObject("Icon");
             iconObj.transform.SetParent(btnObj.transform, false);
 
             RectTransform iconRect = iconObj.AddComponent<RectTransform>();
-            iconRect.anchorMin = Vector2.zero;
-            iconRect.anchorMax = Vector2.one;
+            iconRect.anchorMin = new Vector2(0.15f, 0.15f);
+            iconRect.anchorMax = new Vector2(0.85f, 0.85f);
             iconRect.sizeDelta = Vector2.zero;
 
-            TextMeshProUGUI iconTmp = iconObj.AddComponent<TextMeshProUGUI>();
-            iconTmp.text = "S"; // Score
-            iconTmp.fontSize = 22;
-            iconTmp.alignment = TextAlignmentOptions.Center;
-            iconTmp.color = new Color(0.40f, 0.75f, 1f, 1f);
-            iconTmp.fontStyle = FontStyles.Bold;
-            iconTmp.raycastTarget = false;
+            Image iconImg = iconObj.AddComponent<Image>();
+            Texture2D scoreTex = Resources.Load<Texture2D>("Icons/score");
+            if (scoreTex != null)
+                iconImg.sprite = Sprite.Create(scoreTex, new Rect(0, 0, scoreTex.width, scoreTex.height), new Vector2(0.5f, 0.5f));
+            iconImg.color = new Color(0.40f, 0.75f, 1f, 1f);
+            iconImg.preserveAspect = true;
+            iconImg.raycastTarget = false;
 
             return btn;
         }
@@ -756,22 +756,22 @@ namespace Lekha.UI
                 ToggleEmojiPanel();
             });
 
-            // Plus icon
+            // Emoji smiley icon
             GameObject iconObj = new GameObject("Icon");
             iconObj.transform.SetParent(btnObj.transform, false);
 
             RectTransform iconRect = iconObj.AddComponent<RectTransform>();
-            iconRect.anchorMin = Vector2.zero;
-            iconRect.anchorMax = Vector2.one;
+            iconRect.anchorMin = new Vector2(0.15f, 0.15f);
+            iconRect.anchorMax = new Vector2(0.85f, 0.85f);
             iconRect.sizeDelta = Vector2.zero;
 
-            TextMeshProUGUI iconTmp = iconObj.AddComponent<TextMeshProUGUI>();
-            iconTmp.text = "E"; // Emoji
-            iconTmp.fontSize = 22;
-            iconTmp.alignment = TextAlignmentOptions.Center;
-            iconTmp.color = accentGold;
-            iconTmp.fontStyle = FontStyles.Bold;
-            iconTmp.raycastTarget = false;
+            Image iconImg = iconObj.AddComponent<Image>();
+            Texture2D emojiTex = Resources.Load<Texture2D>("Icons/emoji");
+            if (emojiTex != null)
+                iconImg.sprite = Sprite.Create(emojiTex, new Rect(0, 0, emojiTex.width, emojiTex.height), new Vector2(0.5f, 0.5f));
+            iconImg.color = accentGold;
+            iconImg.preserveAspect = true;
+            iconImg.raycastTarget = false;
 
             Debug.Log($"[GameUI] Emoji button created at {rect.anchoredPosition}");
 
@@ -833,22 +833,22 @@ namespace Lekha.UI
                 }
             });
 
-            // "i" icon text
+            // Info icon (sprite from Resources/Icons)
             GameObject iconObj = new GameObject("Icon");
             iconObj.transform.SetParent(btnObj.transform, false);
 
             RectTransform iconRect = iconObj.AddComponent<RectTransform>();
-            iconRect.anchorMin = Vector2.zero;
-            iconRect.anchorMax = Vector2.one;
+            iconRect.anchorMin = new Vector2(0.15f, 0.15f);
+            iconRect.anchorMax = new Vector2(0.85f, 0.85f);
             iconRect.sizeDelta = Vector2.zero;
 
-            TextMeshProUGUI iconTmp = iconObj.AddComponent<TextMeshProUGUI>();
-            iconTmp.text = "\u2139"; // ℹ character
-            iconTmp.fontSize = 28;
-            iconTmp.alignment = TextAlignmentOptions.Center;
-            iconTmp.color = accentGreen;
-            iconTmp.fontStyle = FontStyles.Bold;
-            iconTmp.raycastTarget = false;
+            Image iconImg = iconObj.AddComponent<Image>();
+            Texture2D infoTex = Resources.Load<Texture2D>("Icons/info");
+            if (infoTex != null)
+                iconImg.sprite = Sprite.Create(infoTex, new Rect(0, 0, infoTex.width, infoTex.height), new Vector2(0.5f, 0.5f));
+            iconImg.color = accentGreen;
+            iconImg.preserveAspect = true;
+            iconImg.raycastTarget = false;
 
             return btn;
         }

@@ -380,8 +380,25 @@ namespace Lekha.UI
             labelRect.anchorMax = Vector2.one;
             labelRect.sizeDelta = Vector2.zero;
 
+            // Chat icon (left side)
+            GameObject chatIconObj = new GameObject("ChatIcon");
+            chatIconObj.transform.SetParent(chatButton.transform, false);
+            RectTransform ciRect = chatIconObj.AddComponent<RectTransform>();
+            ciRect.anchorMin = new Vector2(0, 0.15f);
+            ciRect.anchorMax = new Vector2(0.35f, 0.85f);
+            ciRect.sizeDelta = Vector2.zero;
+
+            Image chatIconImg = chatIconObj.AddComponent<Image>();
+            Texture2D chatTex = Resources.Load<Texture2D>("Icons/chat");
+            if (chatTex != null)
+                chatIconImg.sprite = Sprite.Create(chatTex, new Rect(0, 0, chatTex.width, chatTex.height), new Vector2(0.5f, 0.5f));
+            chatIconImg.color = new Color(0.55f, 0.80f, 1f, 1f);
+            chatIconImg.preserveAspect = true;
+            chatIconImg.raycastTarget = false;
+
+            // "CHAT" text (right side)
             TextMeshProUGUI labelTmp = labelObj.AddComponent<TextMeshProUGUI>();
-            labelTmp.text = "\u2709  CHAT";
+            labelTmp.text = "CHAT";
             labelTmp.fontSize = 16;
             labelTmp.fontStyle = FontStyles.Bold;
             labelTmp.alignment = TextAlignmentOptions.Center;
@@ -551,13 +568,13 @@ namespace Lekha.UI
             closeIconRect.anchorMax = Vector2.one;
             closeIconRect.sizeDelta = Vector2.zero;
 
-            TextMeshProUGUI closeTmp = closeIcon.AddComponent<TextMeshProUGUI>();
-            closeTmp.text = "\u2715";
-            closeTmp.fontSize = 28;
-            closeTmp.fontStyle = FontStyles.Bold;
-            closeTmp.alignment = TextAlignmentOptions.Center;
-            closeTmp.color = Color.white;
-            closeTmp.raycastTarget = false;
+            Image closeImg = closeIcon.AddComponent<Image>();
+            Texture2D closeTex = Resources.Load<Texture2D>("Icons/close");
+            if (closeTex != null)
+                closeImg.sprite = Sprite.Create(closeTex, new Rect(0, 0, closeTex.width, closeTex.height), new Vector2(0.5f, 0.5f));
+            closeImg.color = Color.white;
+            closeImg.preserveAspect = true;
+            closeImg.raycastTarget = false;
         }
 
         private void CreateMessageArea()

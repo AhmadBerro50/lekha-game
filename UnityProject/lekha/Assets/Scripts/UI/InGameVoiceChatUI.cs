@@ -18,9 +18,9 @@ namespace Lekha.UI
         private GameObject rootPanel;
         private Button micButton;
         private Button speakerButton;
-        private TextMeshProUGUI micIconText;
+        private Image micIconImage;
         private TextMeshProUGUI micLabelText;
-        private TextMeshProUGUI speakerIconText;
+        private Image speakerIconImage;
         private TextMeshProUGUI speakerLabelText;
         private Image micButtonBg;
         private Image speakerButtonBg;
@@ -39,11 +39,11 @@ namespace Lekha.UI
         private static readonly Color BgDark         = new Color(0.08f, 0.09f, 0.14f, 0.92f);
         private static readonly Color BgMuted        = new Color(0.22f, 0.06f, 0.06f, 0.92f);
 
-        // Unicode icons
-        private const string IconMicOn   = "\u25CF";   // filled circle = active mic indicator
-        private const string IconMicOff  = "\u2715";   // × = muted
-        private const string IconSpkOn   = "\u25B6";   // ▶ play-like = sound on
-        private const string IconSpkOff  = "\u2715";   // × = muted
+        // ASCII icons (Unicode not supported by default TMP font)
+        private const string IconMicOn   = "MIC";
+        private const string IconMicOff  = "OFF";
+        private const string IconSpkOn   = "SPK";
+        private const string IconSpkOff  = "OFF";
 
         private bool isVisible = false;
 
@@ -121,14 +121,18 @@ namespace Lekha.UI
             // Mic button – bottom left, above hand area
             micButton = CreateButton(rootPanel.transform, "MicButton",
                 new Vector2(68f, 190f), 64f, circle, out micButtonBg, out micRing,
-                out micIconText, out micLabelText, "MIC");
+                out micIconImage, out micLabelText, "MIC");
             micButton.onClick.AddListener(OnMicClicked);
 
             // Speaker button – next to mic
             speakerButton = CreateButton(rootPanel.transform, "SpeakerButton",
                 new Vector2(152f, 190f), 64f, circle, out speakerButtonBg, out Image _ring,
-                out speakerIconText, out speakerLabelText, "SPK");
+                out speakerIconImage, out speakerLabelText, "SPK");
             speakerButton.onClick.AddListener(OnSpeakerClicked);
+
+            // Set initial icon sprites
+            if (micIconImage != null) micIconImage.sprite = LoadIconSprite("mic");
+            if (speakerIconImage != null) speakerIconImage.sprite = LoadIconSprite("speaker");
 
             UpdateButtonStates();
             rootPanel.SetActive(false);
@@ -137,7 +141,7 @@ namespace Lekha.UI
         private Button CreateButton(Transform parent, string name, Vector2 anchoredPos, float size,
             Sprite circleSprite,
             out Image bg, out Image ring,
-            out TextMeshProUGUI iconText, out TextMeshProUGUI labelText,
+            out Image iconImage, out TextMeshProUGUI labelText,
             string labelStr)
         {
             // Container
@@ -183,7 +187,7 @@ namespace Lekha.UI
             colors.pressedColor     = new Color(0.75f, 0.75f, 0.75f, 1f);
             btn.colors              = colors;
 
-            // Main icon (large, centered)
+            // Main icon (sprite image, centered)
             GameObject iconObj = new GameObject("Icon");
             iconObj.transform.SetParent(obj.transform, false);
             RectTransform iconRect = iconObj.AddComponent<RectTransform>();
@@ -191,15 +195,12 @@ namespace Lekha.UI
             iconRect.anchorMax        = new Vector2(0.5f, 0.55f);
             iconRect.pivot            = new Vector2(0.5f, 0.5f);
             iconRect.anchoredPosition = Vector2.zero;
-            iconRect.sizeDelta        = new Vector2(size, size * 0.45f);
+            iconRect.sizeDelta        = new Vector2(size * 0.5f, size * 0.5f);
 
-            iconText              = iconObj.AddComponent<TextMeshProUGUI>();
-            iconText.text         = IconMicOn;
-            iconText.fontSize     = 22f;
-            iconText.fontStyle    = FontStyles.Bold;
-            iconText.alignment    = TextAlignmentOptions.Center;
-            iconText.color        = ActiveGreen;
-            iconText.raycastTarget = false;
+            iconImage              = iconObj.AddComponent<Image>();
+            iconImage.preserveAspect = true;
+            iconImage.color        = ActiveGreen;
+            iconImage.raycastTarget = false;
 
             // Label under icon
             GameObject labelObj = new GameObject("Label");
@@ -257,10 +258,10 @@ namespace Lekha.UI
             if (micButtonBg != null)
                 micButtonBg.color = micMuted ? BgMuted : BgDark;
 
-            if (micIconText != null)
+            if (micIconImage != null)
             {
-                micIconText.text  = micMuted ? IconMicOff : IconMicOn;
-                micIconText.color = micMuted ? MutedRed   : ActiveGreen;
+                micIconImage.sprite = LoadIconSprite(micMuted ? "mic_muted" : "mic");
+                micIconImage.color  = micMuted ? MutedRed : ActiveGreen;
             }
 
             if (micLabelText != null)
@@ -275,10 +276,10 @@ namespace Lekha.UI
             if (speakerButtonBg != null)
                 speakerButtonBg.color = spkMuted ? BgMuted : BgDark;
 
-            if (speakerIconText != null)
+            if (speakerIconImage != null)
             {
-                speakerIconText.text  = spkMuted ? IconSpkOff : IconSpkOn;
-                speakerIconText.color = spkMuted ? SpeakerMuted : SpeakerBlue;
+                speakerIconImage.sprite = LoadIconSprite(spkMuted ? "speaker_muted" : "speaker");
+                speakerIconImage.color  = spkMuted ? SpeakerMuted : SpeakerBlue;
             }
 
             if (speakerLabelText != null)
@@ -326,6 +327,23 @@ namespace Lekha.UI
 
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        private static Dictionary<string, Sprite> _iconCache = new Dictionary<string, Sprite>();
+
+        private static Sprite LoadIconSprite(string iconName)
+        {
+            if (_iconCache.TryGetValue(iconName, out Sprite cached))
+                return cached;
+
+            Texture2D tex = Resources.Load<Texture2D>($"Icons/{iconName}");
+            if (tex != null)
+            {
+                Sprite s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                _iconCache[iconName] = s;
+                return s;
+            }
+            return null;
         }
     }
 }
