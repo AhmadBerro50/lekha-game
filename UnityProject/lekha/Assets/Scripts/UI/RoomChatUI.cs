@@ -40,8 +40,8 @@ namespace Lekha.UI
         private float animationProgress = 0f;
         private bool animatingOpen = false;
         private const float ANIMATION_SPEED = 6f;
-        private const float PANEL_WIDTH = 700f;
-        private const float PANEL_HEIGHT = 500f;
+        private const float PANEL_WIDTH = 1050f;
+        private const float PANEL_HEIGHT = 750f;
 
         // Colors
         private static readonly Color PanelBg = new Color(0.04f, 0.06f, 0.12f, 0.94f);
@@ -495,7 +495,7 @@ namespace Lekha.UI
             header.transform.SetParent(chatPanel.transform, false);
 
             RectTransform headerRect = header.AddComponent<RectTransform>();
-            headerRect.sizeDelta = new Vector2(0, 44);
+            headerRect.sizeDelta = new Vector2(0, 60);
 
             Image headerBg = header.AddComponent<Image>();
             headerBg.color = HeaderBg;
@@ -512,7 +512,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI titleTmp = titleObj.AddComponent<TextMeshProUGUI>();
             titleTmp.text = "CHAT";
-            titleTmp.fontSize = 22;
+            titleTmp.fontSize = 32;
             titleTmp.fontStyle = FontStyles.Bold;
             titleTmp.alignment = TextAlignmentOptions.MidlineLeft;
             titleTmp.color = new Color(0.40f, 0.75f, 1f, 1f);
@@ -527,8 +527,8 @@ namespace Lekha.UI
             closeRect.anchorMin = new Vector2(1, 0.5f);
             closeRect.anchorMax = new Vector2(1, 0.5f);
             closeRect.pivot = new Vector2(1, 0.5f);
-            closeRect.anchoredPosition = new Vector2(-8, 0);
-            closeRect.sizeDelta = new Vector2(40, 40);
+            closeRect.anchoredPosition = new Vector2(-10, 0);
+            closeRect.sizeDelta = new Vector2(50, 50);
 
             Image closeBg = closeObj.AddComponent<Image>();
             closeBg.sprite = GetCircleSprite();
@@ -553,7 +553,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI closeTmp = closeIcon.AddComponent<TextMeshProUGUI>();
             closeTmp.text = "\u2715";
-            closeTmp.fontSize = 20;
+            closeTmp.fontSize = 28;
             closeTmp.fontStyle = FontStyles.Bold;
             closeTmp.alignment = TextAlignmentOptions.Center;
             closeTmp.color = Color.white;
@@ -566,7 +566,7 @@ namespace Lekha.UI
             scrollObj.transform.SetParent(chatPanel.transform, false);
 
             RectTransform scrollObjRect = scrollObj.AddComponent<RectTransform>();
-            scrollObjRect.sizeDelta = new Vector2(0, PANEL_HEIGHT - 44 - 52); // header(44) + input(52)
+            scrollObjRect.sizeDelta = new Vector2(0, PANEL_HEIGHT - 60 - 70); // header(60) + input(70)
 
             Image scrollBg = scrollObj.AddComponent<Image>();
             scrollBg.color = new Color(0, 0, 0, 0.15f);
@@ -624,7 +624,7 @@ namespace Lekha.UI
             inputArea.transform.SetParent(chatPanel.transform, false);
 
             RectTransform inputAreaRect = inputArea.AddComponent<RectTransform>();
-            inputAreaRect.sizeDelta = new Vector2(0, 52);
+            inputAreaRect.sizeDelta = new Vector2(0, 70);
 
             Image inputAreaBg = inputArea.AddComponent<Image>();
             inputAreaBg.color = HeaderBg;
@@ -649,7 +649,7 @@ namespace Lekha.UI
 
             LayoutElement inputLE = inputObj.AddComponent<LayoutElement>();
             inputLE.flexibleWidth = 1;
-            inputLE.preferredHeight = 36;
+            inputLE.preferredHeight = 50;
 
             inputField = inputObj.AddComponent<TMP_InputField>();
             inputField.characterLimit = 200;
@@ -677,7 +677,7 @@ namespace Lekha.UI
             inputTextRect.offsetMax = Vector2.zero;
 
             TextMeshProUGUI inputTmp = inputTextObj.AddComponent<TextMeshProUGUI>();
-            inputTmp.fontSize = 18;
+            inputTmp.fontSize = 30;
             inputTmp.color = TextWhite;
             inputTmp.alignment = TextAlignmentOptions.MidlineLeft;
             inputTmp.isRightToLeftText = false; // Will auto-handle mixed text
@@ -696,7 +696,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI placeholderTmp = placeholderObj.AddComponent<TextMeshProUGUI>();
             placeholderTmp.text = "Type a message...";
-            placeholderTmp.fontSize = 18;
+            placeholderTmp.fontSize = 30;
             placeholderTmp.fontStyle = FontStyles.Italic;
             placeholderTmp.color = TextMuted;
             placeholderTmp.alignment = TextAlignmentOptions.MidlineLeft;
@@ -712,8 +712,8 @@ namespace Lekha.UI
             sendBg.color = SendBtnColor;
 
             LayoutElement sendLE = sendObj.AddComponent<LayoutElement>();
-            sendLE.preferredWidth = 60;
-            sendLE.preferredHeight = 36;
+            sendLE.preferredWidth = 90;
+            sendLE.preferredHeight = 50;
 
             sendButton = sendObj.AddComponent<Button>();
             sendButton.targetGraphic = sendBg;
@@ -735,7 +735,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI sendTmp = sendTextObj.AddComponent<TextMeshProUGUI>();
             sendTmp.text = "Send";
-            sendTmp.fontSize = 18;
+            sendTmp.fontSize = 30;
             sendTmp.fontStyle = FontStyles.Bold;
             sendTmp.alignment = TextAlignmentOptions.Center;
             sendTmp.color = Color.white;
@@ -806,7 +806,7 @@ namespace Lekha.UI
 
                 TextMeshProUGUI nameTmp = nameObj.AddComponent<TextMeshProUGUI>();
                 nameTmp.text = entry.PlayerName;
-                nameTmp.fontSize = 15;
+                nameTmp.fontSize = 28;
                 nameTmp.fontStyle = FontStyles.Bold;
                 nameTmp.color = GetPositionColor(entry.Position);
                 nameTmp.alignment = TextAlignmentOptions.TopLeft;
@@ -819,7 +819,7 @@ namespace Lekha.UI
 
             TextMeshProUGUI textTmp = textObj.AddComponent<TextMeshProUGUI>();
             textTmp.text = entry.Text;
-            textTmp.fontSize = 20;
+            textTmp.fontSize = 36;
             textTmp.color = TextWhite;
             textTmp.enableWordWrapping = true;
             textTmp.raycastTarget = false;
@@ -847,7 +847,7 @@ namespace Lekha.UI
             TextMeshProUGUI tsTmp = tsObj.AddComponent<TextMeshProUGUI>();
             var dt = System.DateTimeOffset.FromUnixTimeMilliseconds(entry.Timestamp).LocalDateTime;
             tsTmp.text = dt.ToString("HH:mm");
-            tsTmp.fontSize = 13;
+            tsTmp.fontSize = 22;
             tsTmp.color = TextMuted;
             tsTmp.alignment = entry.IsLocal ? TextAlignmentOptions.TopRight : TextAlignmentOptions.TopLeft;
             tsTmp.raycastTarget = false;

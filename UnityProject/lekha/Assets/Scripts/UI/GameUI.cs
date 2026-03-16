@@ -626,11 +626,12 @@ namespace Lekha.UI
             iconRect.sizeDelta = Vector2.zero;
 
             TextMeshProUGUI iconTmp = iconObj.AddComponent<TextMeshProUGUI>();
-            iconTmp.text = "i";
-            iconTmp.fontSize = 26;
+            iconTmp.text = "S"; // Score
+            iconTmp.fontSize = 22;
             iconTmp.alignment = TextAlignmentOptions.Center;
             iconTmp.color = new Color(0.40f, 0.75f, 1f, 1f);
-            iconTmp.fontStyle = FontStyles.Bold | FontStyles.Italic;
+            iconTmp.fontStyle = FontStyles.Bold;
+            iconTmp.raycastTarget = false;
 
             return btn;
         }
@@ -765,8 +766,8 @@ namespace Lekha.UI
             iconRect.sizeDelta = Vector2.zero;
 
             TextMeshProUGUI iconTmp = iconObj.AddComponent<TextMeshProUGUI>();
-            iconTmp.text = "+";
-            iconTmp.fontSize = 28;
+            iconTmp.text = "E"; // Emoji
+            iconTmp.fontSize = 22;
             iconTmp.alignment = TextAlignmentOptions.Center;
             iconTmp.color = accentGold;
             iconTmp.fontStyle = FontStyles.Bold;
