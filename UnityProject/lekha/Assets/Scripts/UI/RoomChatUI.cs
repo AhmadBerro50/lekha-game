@@ -801,18 +801,21 @@ namespace Lekha.UI
             bubbleBg.color = entry.IsLocal ? MyMessageBg : OtherMessageBg;
 
             LayoutElement bubbleLE = bubble.AddComponent<LayoutElement>();
-            bubbleLE.preferredWidth = PANEL_WIDTH * 0.72f;
+            // No fixed width — let ContentSizeFitter handle it dynamically
+            // Cap max width so long messages still wrap
+            bubbleLE.preferredWidth = -1;
             bubbleLE.flexibleWidth = 0;
 
             VerticalLayoutGroup bubbleVlg = bubble.AddComponent<VerticalLayoutGroup>();
-            bubbleVlg.padding = new RectOffset(10, 10, 6, 6);
+            bubbleVlg.padding = new RectOffset(16, 16, 8, 8);
             bubbleVlg.spacing = 2;
             bubbleVlg.childControlWidth = true;
             bubbleVlg.childControlHeight = true;
-            bubbleVlg.childForceExpandWidth = true;
+            bubbleVlg.childForceExpandWidth = false;
             bubbleVlg.childForceExpandHeight = false;
 
             ContentSizeFitter bubbleCsf = bubble.AddComponent<ContentSizeFitter>();
+            bubbleCsf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             bubbleCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             // Player name (skip for local messages)
@@ -833,6 +836,10 @@ namespace Lekha.UI
             // Message text
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(bubble.transform, false);
+
+            // Cap text width so long messages wrap
+            LayoutElement textLE = textObj.AddComponent<LayoutElement>();
+            textLE.preferredWidth = PANEL_WIDTH * 0.65f;
 
             TextMeshProUGUI textTmp = textObj.AddComponent<TextMeshProUGUI>();
             textTmp.text = entry.Text;
